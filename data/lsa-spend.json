@@ -1,8 +1,9 @@
 {
-  "note": "Google LSA spend is not in the Google Ads account Windsor reads. Enter each month's total from the LSA dashboard (ads.google.com/localservices). The dashboard spreads it evenly across the month.",
+  "note": "Google LSA spend by month, from the LSA dashboard.",
   "months": {
     "2026-06": 0,
     "2026-07": 749,
-    "2026-08": 2711
+    "2026-08": 2711,
+    "2026-09": 0
   }
 }
