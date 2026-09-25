@@ -31,7 +31,7 @@ It only commits when the numbers change, and each commit rebuilds the dashboard.
 
 - **Open Dental API**: the same developer key and customer key the sync uses. The key's permissions in Open Dental must allow **Queries** (ShortQuery). If `--check` fails on OpenDental with 401 or 403, enable it under Setup → Advanced Setup → API.
 - **GHL token** for the Full Smile sub-account: contacts.readonly, opportunities.readonly, locations/customFields.readonly.
-- **GitHub fine-grained token**: repository access = only `fullsmile-dashboard`, permission Contents = Read and write.
+- **GitHub fine-grained token**: resource owner `flow-co-ai`, repository access = only `full-smile`, permission Contents = Read and write.
 
 ## What it reads
 
@@ -40,10 +40,28 @@ It only commits when the numbers change, and each commit rebuilds the dashboard.
 | Production | procedurelog, ProcStatus = 2, ProcFee × (UnitQty + BaseUnits), by ProcDate |
 | Collected | paysplit.SplitAmt by DatePay, plus claimproc.InsPayAmt (Status Received/Supplemental) by DateCP. Write-offs excluded. |
 | Visits, broken, show rate | appointment by AptDateTime, AptStatus 2 = complete, 5 = broken |
-| New patients | patient.DateFirstVisit, counted by week |
+| New patients | first completed appointment flagged IsNewPatient, counted by week. (Not DateFirstVisit: the GHL sync stamps it on records it creates.) |
 | Source of a new patient | GHL contact matched by PatNum field, then phone, then email; else the OpenDental "Referred from" entry |
 | Services | CDT code ranges (D6000s implants, D2700s crowns, D9947–D9949 sleep apnea, D7000s surgery, etc.) |
 | Snapshots | recall overdue, planned treatment with no appointment, broken appointments not rebooked, active patients |
 
 Leads: GHL contacts, excluding contacts created by the OpenDental sync (source "OpenDental", "OD Patient", or tagged
 `open-dental-synced` with no marketing source) and anything tagged spam/test/duplicate.
+
+## Version 2 additions (all totals)
+
+| Number | From |
+|---|---|
+| Procedures by code, by month | procedurelog + procedurecode |
+| Production days and patients per provider, by month | procedurelog |
+| Treatment follow-through | procedurelog by DateTP month: done, scheduled, not scheduled (same-day work excluded) |
+| Unscheduled treatment by age and service | procedurelog ProcStatus 1, AptNum 0 |
+| Patient balances | patient aging fields on guarantors |
+| Unpaid insurance | claim, by status and days since sent |
+| Insurance plans | claimproc received, by carrier and month: billed, paid, written off |
+| Hygiene rebooking | completed visits with D1110/D1120/D4910/D4346/D434x/D4355 that have a later visit booked or done |
+| Chair time | schedule (provider hours) and appointment Pattern (5-minute steps), by week and provider |
+| Active patients by month end | distinct patients with a completed procedure in the prior 18 months |
+| Daily snapshot history | kept in practice.json under `history`, one entry per day |
+
+Every new query runs through `od_try`, so an older Open Dental version that lacks a column adds a note instead of stopping the run.

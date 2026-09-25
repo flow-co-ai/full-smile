@@ -2,13 +2,28 @@
   "practice_name": "Full Smile Dental",
   "timezone": "America/Chicago",
   "ghl_opportunities_url": "",
+  "ghl_app_base": "https://app.gohighlevel.com",
+  "ghl_location_id": "",
   "windsor": {
-    "facebook": ["1222692849377651", "884349931007007"],
-    "facebook_leads": ["986536337875135"],
-    "google_ads": ["256-681-8994"],
-    "google_my_business": ["locations/9295260348937485711"],
-    "searchconsole": ["https://fullsmilechicago.com/"],
-    "instagram": ["17841477163064218"]
+    "facebook": [
+      "1222692849377651",
+      "884349931007007"
+    ],
+    "facebook_leads": [
+      "986536337875135"
+    ],
+    "google_ads": [
+      "256-681-8994"
+    ],
+    "google_my_business": [
+      "locations/9295260348937485711"
+    ],
+    "searchconsole": [
+      "https://fullsmilechicago.com/"
+    ],
+    "instagram": [
+      "17841477163064218"
+    ]
   },
   "instagram_handle": "fullsmiledentalworth",
   "brand_regex": "full ?smile",
@@ -22,5 +37,6 @@
     "metal free dental implants",
     "ceramic dental implants",
     "sleep apnea dentist near me"
-  ]
+  ],
+  "ads_active": false
 }
