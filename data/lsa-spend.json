@@ -1,9 +1,10 @@
 {
-  "note": "Google LSA spend by month, from the LSA dashboard.",
+  "note": "Google LSA spend by month: the 'Home Services Ads activity' line in LSA billing.",
   "months": {
+    "2026-05": 0,
     "2026-06": 0,
-    "2026-07": 749,
-    "2026-08": 2711,
-    "2026-09": 0
+    "2026-07": 748.91,
+    "2026-08": 2711.26,
+    "2026-09": 1328.50
   }
 }
