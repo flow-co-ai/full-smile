@@ -293,6 +293,11 @@ def practice_depth(a, b, ahead):
         ROUND(SUM(CASE WHEN ap.AptStatus IN (1,2) THEN LENGTH(ap.Pattern) ELSE 0 END)*5/60,1) AS hrs,
         SUM(ap.AptStatus=2) AS done, SUM(ap.AptStatus=1) AS sched, SUM(ap.AptStatus=5) AS broken
         FROM appointment ap WHERE ap.AptStatus IN (1,2,5) AND ap.AptDateTime BETWEEN '{a} 00:00:00' AND '{ahead} 23:59:59' GROUP BY wk, prov""")
+    # How far back OpenDental's treatment history goes, and distinct patients seen each month.
+    o['firstRecord'] = od_try('first recorded treatment', """SELECT MIN(pl.ProcDate) AS d FROM procedurelog pl
+        WHERE pl.ProcStatus=2 AND pl.ProcDate > '1990-01-01'""")
+    o['seenMonthly'] = od_try('patients seen by month', f"""SELECT DATE_FORMAT(pl.ProcDate,'%Y-%m') AS m, COUNT(DISTINCT pl.PatNum) AS n
+        FROM procedurelog pl WHERE pl.ProcStatus=2 AND pl.ProcDate BETWEEN '{a}' AND '{b}' GROUP BY m""")
     # Active patients (a completed visit in the prior 18 months) at each month end.
     o['activeMonthly'] = []
     first = dt.date.fromisoformat(a).replace(day=1)
@@ -462,6 +467,8 @@ def build():
         'sched': [[d10(r.get('wk')), str(r.get('prov')), round(num(r.get('hrs')), 1)] for r in od.get('sched') or [] if d10(r.get('wk'))],
         'booked': [[d10(r.get('wk')), str(r.get('prov')), round(num(r.get('hrs')), 1), int(num(r.get('done'))), int(num(r.get('sched'))), int(num(r.get('broken')))] for r in od.get('booked') or [] if d10(r.get('wk'))],
         'activeMonthly': od.get('activeMonthly') or [],
+        'firstRecord': d10((od.get('firstRecord') or [{}])[0].get('d')) or None,
+        'seenMonthly': [[r.get('m'), int(num(r.get('n')))] for r in od.get('seenMonthly') or []],
     }
 
     # --- GHL: who is a lead, and where they came from

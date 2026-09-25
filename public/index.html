@@ -238,6 +238,13 @@ button.b3:hover>span:first-child{color:var(--accent)}
 .soon{background:#f6f8fc;border:1px dashed var(--line);border-radius:14px;padding:14px 16px;font-size:13.5px;color:var(--text2);margin-top:10px}
 @media (max-width:1180px){.hero{grid-template-columns:1fr}.fun{grid-template-columns:repeat(3,1fr)}.fun div:nth-child(4){border-left:none;padding-left:0}}
 @media (max-width:860px){.top2{flex-wrap:wrap}.act{grid-template-columns:52px 1fr}.act .do{grid-column:2;align-items:flex-start}.fun{grid-template-columns:1fr 1fr}.fun div{border-left:none !important;padding-left:0 !important}.b3{grid-template-columns:110px 1fr 60px}}
+
+.kpis.k5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.b3.slim{grid-template-columns:minmax(120px,190px) 1fr 40px;padding:6px 0}
+.card.flush{padding:20px 0 0;overflow:hidden}.card.flush>.top2{padding:0 22px 6px}
+.card .lk{font-size:13px}
+@media (max-width:1180px){.kpis.k5{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:860px){.kpis.k5{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -257,6 +264,7 @@ button.b3:hover>span:first-child{color:var(--accent)}
 <aside id="side" aria-hidden="true" aria-labelledby="st"><div class="sh"><button class="back" id="sback" hidden>Back</button><div class="t"><h2 id="st"></h2><div class="k" id="sk"></div></div><button class="x" id="sx" aria-label="Close">✕</button></div><div class="sb" id="sbody"></div></aside>
 
 <script>
+
 // ---------- helpers
 const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const el = id => document.getElementById(id);
@@ -304,18 +312,12 @@ const OD = { recall: 'Lists › Recall', unsched: 'Lists › Unscheduled', tx: '
 const odp = k => `<span class="od">In OpenDental: <b>${OD[k]}</b></span>`;
 
 let D;
-const S = { win: 30, tab: 'overview', stack: [] };
+const S = { win: 'mtd', tab: 'pulse', stack: [], rankAll: false };
 const P = () => D.practice;
 const PR = () => D.practice?.practice;
 const V2 = () => (D.practice?.version || 1) >= 2;
 
 // ---------- ranges
-function range() { return [shift(D.today, -S.win), shift(D.today, -1)]; }
-function prior() { const [a] = range(); return [shift(a, -S.win), shift(a, -1)]; }
-const hasPrior = () => P() && prior()[0] >= P().window[0];
-const rangeWords = () => (S.win === 365 ? 'in the last 12 months' : `in the last ${S.win} days`);
-const priorWords = () => (S.win === 365 ? 'the 12 months before' : `the ${S.win} days before`);
-const winLabel = () => (S.win === 365 ? 'Last 12 months' : `Last ${S.win} days`);
 const inR = (d, r) => d >= r[0] && d <= r[1];
 // Weekly totals from the droplet: a week counts when most of it falls in the range.
 const wkIn = (wk, r) => wk >= shift(r[0], -3) && wk <= shift(r[1], -3);
@@ -387,8 +389,10 @@ function chairAhead() {
 }
 function weekdayIn(r) { const out = [0, 1, 2, 3, 4, 5, 6].map(i => ({ i, done: 0, broken: 0 })); for (const x of PR()?.daily || []) if (inR(x[0], r)) { const w = (new Date(`${x[0]}T12:00:00Z`).getUTCDay() + 6) % 7; out[w].done += x[4]; out[w].broken += x[5]; } return out.filter(x => x.done + x.broken > 0).map(x => ({ ...x, rate: x.broken / (x.done + x.broken) })); }
 const DOW = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const histReady = () => { const f = PR()?.firstRecord; if (!f) return false; const x = new Date(`${f}T12:00:00Z`); x.setUTCMonth(x.getUTCMonth() + 18); return x.toISOString().slice(0, 10) <= D.today; };
+const fullFrom = () => { const f = PR()?.firstRecord; if (!f) return null; const x = new Date(`${f}T12:00:00Z`); x.setUTCMonth(x.getUTCMonth() + 18); return x.toISOString().slice(0, 7); };
 function bridge() {
-  const p = PR(); if (!p?.activeMonthly?.length) return null;
+  const p = PR(); if (!p?.activeMonthly?.length || !histReady()) return null;
   const am = p.activeMonthly.slice(-13), rows = [];
   for (let i = 1; i < am.length; i++) {
     const m = am[i][0].slice(0, 7), nw = sum(p.daily.filter(x => x[0].startsWith(m)), x => x[7]), net = am[i - 1][1] + nw - am[i][1];
@@ -409,7 +413,7 @@ function followups() {
   push('warn', s.brokenNotRebooked, 'Missed visits not rebooked', 'Broken appointments in the last 60 days with nothing booked since.', odp('unsched'));
   push('warn', wt.contactedNotBooked, 'Leads reached but not booked', 'Contacted in the last 30 days with no appointment yet.', ghlBtn('opps', 'Open in GHL'));
   push('', s.recallOverdue, 'Patients overdue for a cleaning', `Recall due and not booked. ${n0(s.recallDue30)} more come due in the next 30 days.`, odp('recall'));
-  if (s.unschedAmount) push('', s.unschedPatients, `Patients with ${$k(s.unschedAmount)} of treatment not scheduled`, 'Diagnosed in the last 18 months with no appointment. The most recent plans are the easiest to book.', `<button class="btn" data-tab="treatment">See treatment</button>${odp('tx')}`);
+  if (s.unschedAmount) push('', s.unschedPatients, `Patients with ${$k(s.unschedAmount)} of treatment not scheduled`, 'Diagnosed in the last 18 months with no appointment. The most recent plans are the easiest to book.', `<button class="btn" data-tab="money">See treatment</button>${odp('tx')}`);
   const old = cl.filter(x => ['d90', 'old'].includes(x[0])), unsent = cl.find(x => x[0] === 'unsent');
   if (old.length) push('warn', sum(old, x => x[1]), `Insurance claims unpaid past 60 days, ${$k(sum(old, x => x[2]))}`, 'Sent and still waiting on the insurer. Worth a call or a resubmission.', odp('claims'));
   if (unsent) push('warn', unsent[1], `Claims not sent yet, ${$k(unsent[2])}`, 'Created but never sent, so the clock has not started.', odp('send'));
@@ -438,52 +442,248 @@ function findings() {
 }
 
 // ---------- views
-const VIEWS = [['overview', 'Overview'], ['patients', 'New patients'], ['marketing', 'Marketing results'], ['production', 'Production'], ['treatment', 'Treatment'], ['hygiene', 'Hygiene & schedule'], ['visibility', 'Online presence'], ['followups', 'Follow-ups']];
-function readTab() { const t = location.hash.slice(1); S.tab = VIEWS.some(x => x[0] === t) ? t : 'overview'; }
+// ---------- ranges: owners think in months
+const prevM = m => { const x = new Date(`${m}-15T12:00:00Z`); x.setUTCMonth(x.getUTCMonth() - 1); return x.toISOString().slice(0, 7); };
+const mName = m => MO[+m.slice(5, 7) - 1];
+const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const mFull = m => monthNames[+m.slice(5, 7) - 1];
+function range() {
+  const y = shift(D.today, -1);
+  if (S.win === 'mtd') { const a = `${D.today.slice(0, 7)}-01`; return a > y ? [`${y.slice(0, 7)}-01`, y] : [a, y]; }
+  if (S.win === 'last') return mRange(prevM(D.today.slice(0, 7)));
+  return [shift(D.today, -S.win), y];
+}
+function prior() {
+  const [a, b] = range();
+  if (S.win === 'mtd') { const pm = prevM(a.slice(0, 7)), pa = `${pm}-01`; return [pa, shift(pa, Math.min(days(a, b), dim(pm)) - 1)]; }
+  if (S.win === 'last') return mRange(prevM(a.slice(0, 7)));
+  return [shift(a, -S.win), shift(a, -1)];
+}
+const hasPrior = () => P() && prior()[0] >= P().window[0];
+const rangeWords = () => ({ mtd: 'so far this month', last: `in ${mFull(range()[0])}`, 90: 'in the last 90 days', 365: 'in the last 12 months' })[S.win];
+const priorWords = () => ({ mtd: `the same days of ${mFull(prior()[0])}`, last: mFull(prior()[0]), 90: 'the 90 days before', 365: 'the 12 months before' })[S.win];
+const winLabel = () => ({ mtd: `${mFull(range()[0])} so far`, last: `${mFull(range()[0])} ${range()[0].slice(0, 4)}`, 90: 'Last 90 days', 365: 'Last 12 months' })[S.win];
+// Month-to-date pace: straight-line to month end, against last month's full total.
+function pace(key) {
+  if (S.win !== 'mtd') return '';
+  const [a, b] = range(), m = a.slice(0, 7), el2 = days(a, b), full = practiceIn(mRange(prevM(m)))[key], cur = practiceIn(range())[key];
+  if (!el2 || el2 >= dim(m)) return '';
+  const fmt = key === 'np' ? n0 : $k;
+  return `<em>On pace for ${fmt(cur / el2 * dim(m))}. ${mName(prevM(m))} was ${fmt(full)}.</em>`;
+}
+
+// ---------- views
+const VIEWS = [['pulse', 'The pulse'], ['growth', 'Growth'], ['money', 'Money'], ['team', 'Chair & team']];
+function readTab() { const t = location.hash.slice(1); S.tab = VIEWS.some(x => x[0] === t) ? t : 'pulse'; }
 function render() {
   document.querySelectorAll('#win button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.win === String(S.win))));
   const fu = followups().filter(x => x.sev === 'hot' || x.sev === 'warn').length;
-  el('nav').innerHTML = VIEWS.map(([k, t]) => `<button data-tab="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span><b>${t}</b></span>${k === 'followups' && fu ? `<i class="badge">${fu}</i>` : ''}</button>`).join('');
-  const fn = { overview: overviewView, patients: patientsView, marketing: marketingView, production: productionView, treatment: treatmentView, hygiene: hygieneView, visibility: visibilityView, followups: followupsView }[S.tab];
-  if (!P() && !['visibility'].includes(S.tab)) { el('vhead').innerHTML = `<h1>Practice numbers are on the way.</h1><p class="tag">The droplet has not sent OpenDental data yet.</p>`; el('view').innerHTML = ''; return; }
-  const [head, tag, body, hero] = fn();
-  el('win').style.visibility = S.tab === 'followups' ? 'hidden' : 'visible';
-  el('vhead').innerHTML = hero ? '' : `<div class="eyebrow">${S.tab === 'followups' ? 'Right now' : winLabel()}</div><h1>${head}</h1>${tag ? `<p class="tag">${tag}</p>` : ''}`;
-  el('view').innerHTML = (P() && !V2() ? `<div class="banner">Some sections fill in after the droplet's next update (new script). Totals shown now are from OpenDental and GHL.</div>` : '') + body;
+  el('nav').innerHTML = VIEWS.map(([k, t]) => `<button data-tab="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span><b>${t}</b></span>${k === 'team' && fu ? `<i class="badge">${fu}</i>` : ''}</button>`).join('');
+  if (!P()) { el('vhead').innerHTML = `<h1>Practice numbers are on the way.</h1><p class="tag">The droplet has not sent OpenDental data yet.</p>`; el('view').innerHTML = ''; return; }
+  const [head, tag, body, hero] = ({ pulse: pulseView, growth: growthView, money: moneyView, team: teamView })[S.tab]();
+  el('vhead').innerHTML = hero ? '' : `<div class="eyebrow">${winLabel()}</div><h1>${head}</h1>${tag ? `<p class="tag">${tag}</p>` : ''}`;
+  el('view').innerHTML = (!V2() ? `<div class="banner">Some sections fill in after the droplet's next update. Totals shown now are from OpenDental and GHL.</div>` : '') + body;
 }
-const kpi = (v, label, em, sp, attrs, tgt) => `<button class="kpi" ${attrs || ''}><b>${v}</b><span>${label}</span>${tgt ? `<span class="tgt">${tgt}</span>` : ''}${em || '<em></em>'}${sp || ''}</button>`;
+const kpi = (v, label, em, sp, attrs, sub) => `<button class="kpi" ${attrs || ''}><b>${v}</b><span>${label}</span>${sub ? `<span class="tgt">${sub}</span>` : ''}${em || '<em></em>'}${sp || ''}</button>`;
+const cardHead = (t, cap, btn) => `<div class="top2"><div><h3>${t}</h3>${cap ? `<p class="cap">${cap}</p>` : ''}</div>${btn || ''}</div>`;
+const sideBtn = (side, label) => `<button class="more" style="margin:0" data-side="${side}">${label}</button>`;
 
-// ----- Overview
-function overviewView() {
-  const r = range(), T = practiceIn(r), Q = hasPrior() ? practiceIn(prior()) : null, W = weeks12(), p = PR(), s = snap(), b = bridge();
-  const wk = f => W.map(x => f(x)), M = months12();
-  const head = `${pl(T.np, 'new patient')} and ${$k(T.coll)} collected.`;
-  const tag = Q ? (T.np === Q.np ? `Same number of new patients as ${priorWords()}.` : `${T.np > Q.np ? 'Up' : 'Down'} from ${pl(Q.np, 'new patient')} in ${priorWords()}.`) : '';
-  const f = findings();
+// ----- The pulse
+function pulseView() {
+  const r = range(), T = practiceIn(r), Q = hasPrior() ? practiceIn(prior()) : null, W = weeks12(), p = PR(), b = bridge(), s = snap();
+  const wk = f => W.map(x => f(x));
+  const head = `${$k(T.prod)} produced and ${$k(T.coll)} collected ${rangeWords()}.`;
+  const tag = S.win === 'mtd' ? pace('prod').replace(/<\/?em>/g, '') : Q ? `Production ${T.prod >= Q.prod ? 'up' : 'down'} ${pct(Math.abs(T.prod - Q.prod) / Math.max(1, Q.prod))} on ${priorWords()}.` : '';
   const hero = `<div class="hero"><div><div class="eyebrow">${winLabel()}</div><h1>${head}</h1>${tag ? `<p class="tag">${tag}</p>` : ''}</div>
-    <div class="brief">${f.map(([c, t]) => `<p class="${c}">${esc(t)}</p>`).join('')}</div></div>`;
-  const active = b ? b.end : s.activePatients;
-  const band = `<div class="navy"><div class="kpis">
-    ${kpi(n0(active), 'Active patients', b ? `<em class="${b.end >= b.start ? 'good' : 'bad'}">${b.end >= b.start ? '▲' : '▼'} ${n0(Math.abs(b.end - b.start))} in 12 months</em>` : '<em>Seen in the last 18 months</em>', b ? kspark(p.activeMonthly.slice(-12).map(x => x[1])) : '', 'data-side="k:active"')}
-    ${kpi(n0(T.np), 'New patients', delta(T.np, Q?.np, false, true), kspark(wk(x => practiceIn(x).np)), 'data-tab="patients"')}
-    ${kpi($k(T.prod), 'Production', delta(T.prod, Q?.prod), kspark(wk(x => practiceIn(x).prod)), 'data-side="k:prod"')}
-    ${kpi($k(T.coll), 'Collected', delta(T.coll, Q?.coll), kspark(wk(x => practiceIn(x).coll)), 'data-side="k:coll"')}
-    ${T.collRate != null ? kpi(pct(T.collRate), 'Collection rate', ptDelta(T.collRate, Q?.collRate), kspark(M.map(m => practiceIn(mRange(m)).collRate || 0)), 'data-side="k:coll"', 'Target 98% after write-offs')
-      : kpi(pct(per(T.coll, T.prod)), 'Collected vs produced', ptDelta(per(T.coll, T.prod), Q && per(Q.coll, Q.prod)), kspark(M.map(m => { const x = practiceIn(mRange(m)); return per(x.coll, x.prod) || 0; })), 'data-side="k:coll"')}
+    <div class="brief">${findings().map(([c, t]) => `<p class="${c}">${esc(t)}</p>`).join('')}</div></div>`;
+  const rate = T.collRate != null ? T.collRate : per(T.coll, T.prod);
+  const band = `<div class="navy"><div class="kpis k5">
+    ${kpi($k(T.prod), 'Production', pace('prod') || delta(T.prod, Q?.prod), kspark(wk(x => practiceIn(x).prod)), 'data-side="k:prod"')}
+    ${kpi($k(T.coll), 'Collected', pace('coll') || delta(T.coll, Q?.coll), kspark(wk(x => practiceIn(x).coll)), 'data-side="k:coll"', `${pct(rate)} of production${T.collRate != null ? ' after write-offs' : ''}`)}
+    ${kpi(n0(T.np), 'New patients', pace('np') || delta(T.np, Q?.np, false, true), kspark(wk(x => practiceIn(x).np)), 'data-tab="growth"')}
+    ${kpi(n0(b ? b.end : s.activePatients), 'Active patients', b ? `<em class="${b.end >= b.start ? 'good' : 'bad'}">${b.end >= b.start ? '▲' : '▼'} ${n0(Math.abs(b.end - b.start))} in 12 months</em>` : '<em>A completed visit in the last 18 months</em>', b ? kspark(p.activeMonthly.slice(-12).map(x => x[1])) : p.seenMonthly?.length ? kspark(months12().map(m => (p.seenMonthly.find(x => x[0] === m) || [0, 0])[1])) : '', 'data-side="k:active"')}
     ${kpi(pct(T.show), 'Kept appointments', ptDelta(T.show, Q?.show), kspark(wk(x => practiceIn(x).show || 0)), 'data-side="k:show"', 'Target 90% or more')}
   </div></div>`;
-  const cards = `<div class="grid">
-    <div class="card c8">${bridgeCard(b)}</div>
-    ${todayCard()}
-    ${miniCards()}
-  </div>`;
-  return ['', '', hero + band + cards, true];
+  return ['', '', `${hero}${band}<div class="grid"><div class="card c8">${bridgeCard(b)}</div>${todayCard()}</div>`, true];
 }
+
+// ----- Growth: where patients come from, what marketing returned, how the practice is found
+function growthView() {
+  const r = range(), T = practiceIn(r), Q = hasPrior() ? practiceIn(prior()) : null, p = PR(), M = months12(), src = sourcesIn(r);
+  const npTot = sum(src, 'np'), ret = sum(src, 'ret');
+  const head = `${pl(T.np, 'new patient')} ${rangeWords()}.`;
+  const tag = [S.win === 'mtd' ? pace('np').replace(/<\/?em>/g, '') : Q ? `${T.np >= Q.np ? 'Up' : 'Down'} from ${Q.np} in ${priorWords()}.` : '', V2() && npTot ? `${pct(ret / npTot)} have been back for a second visit.` : ''].filter(Boolean).join(' ');
+  // new patients by month, stacked by source
+  const byM = M.map(m => ({ m, n: sum(p.daily.filter(x => x[0].startsWith(m)), x => x[7]), src: V2() ? sourcesIn(mRange(m)) : [] }));
+  const Wd = 760, H = 150, gw = Wd / 12, bw = Math.min(36, gw * .58), mx = Math.max(1, ...byM.map(x => x.n));
+  let ch = `<svg class="chart" viewBox="0 -14 ${Wd} ${H + 34}" role="img" aria-label="New patients by month">`;
+  byM.forEach((x, i) => { const px = i * gw + (gw - bw) / 2; let y = H; const tot = sum(x.src, 'np') || x.n;
+    if (x.src.length) for (const s2 of x.src) { if (!s2.np) continue; const hh = s2.np / mx * (H - 8) * (x.n / tot); y -= hh; ch += `<rect x="${px}" y="${y}" width="${bw}" height="${hh}" fill="${s2.color}"><title>${ml(x.m)}: ${s2.np} from ${esc(s2.label)}</title></rect>`; }
+    else { const hh = x.n / mx * (H - 8); y -= hh; ch += `<rect x="${px}" y="${y}" width="${bw}" height="${hh}" rx="3" fill="#4da8d3"><title>${ml(x.m)}: ${x.n} new patients</title></rect>`; }
+    ch += `<text x="${px + bw / 2}" y="${y - 5}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#25385c" font-family="Urbanist">${x.n || ''}</text><text x="${px + bw / 2}" y="${H + 15}" text-anchor="middle" font-size="11" fill="#8491a7" font-family="Urbanist">${ms(x.m)}</text>`; });
+  ch += `<line x1="0" y1="${H}" x2="${Wd}" y2="${H}" stroke="#dce8f4"/></svg>`;
+  const used = [...new Set(byM.flatMap(x => x.src.filter(s2 => s2.np).map(s2 => s2.k)))];
+  const trend = `<div class="card c8">${cardHead('New patients by month', 'First completed visits, as OpenDental flags them.')}${used.length ? `<div class="legend" style="margin-top:6px">${used.map(k => `<span><i style="background:${CH[k].color}"></i>${esc(chLabel(k))}</span>`).join('')}</div>` : ''}${ch}</div>`;
+  const top6 = src.filter(x => x.np).slice(0, 6), smx = Math.max(1, ...top6.map(x => x.np));
+  const where = `<div class="card c4">${cardHead('Where they came from', rangeWords()[0].toUpperCase() + rangeWords().slice(1) + '.', V2() ? sideBtn('sources', 'Details') : '')}
+    ${V2() ? top6.map(x => `<button class="b3 slim" data-side="src:${x.k}"><span>${esc(x.label)}</span><span class="t"><i style="width:${x.np / smx * 100}%;background:${x.color}"></i></span><b>${x.np}</b></button>`).join('') || '<p class="cap">No new patients yet.</p>' : soon('The source of each new patient')}</div>`;
+  return [head, tag, `<div class="grid">${trend}${where}${marketingCard(r)}${rankCard()}${profileCard(r)}</div>`];
+}
+function marketingCard(r) {
+  const ok = V2() && (P().leads.weeks[0] || []).length >= 8;
+  if (!ok) return `<div class="card c12"><h3>Marketing results</h3><p class="cap" style="margin-top:6px;max-width:72ch">Arrives with the droplet update. Only patients whose lead came in before their first visit are credited, and each is confirmed in OpenDental.</p></div>`;
+  const rows = marketingIn(r), paid = rows.filter(x => x.spend > 0), spend = sum(paid, 'spend'), np = sum(paid, 'np'), coll = sum(paid, 'coll');
+  const ent = D.lsa?.entered || [], need = months12().filter(m => mw(m, r) > 0 && !ent.includes(m) && (P().leads.weeks || []).some(x => x[1] === 'lsa' && x[2] && x[0].slice(0, 7) === m));
+  const cap = spend ? `${$(spend)} in ads brought ${pl(np, 'new patient')} who have paid ${$(coll)} so far${coll ? `, ${(coll / spend).toFixed(1)}× the spend` : ''}. Leads are followed from the week they came in.` : 'Leads followed from the week they came in.';
+  return `<div class="card c12 flush">${cardHead('Marketing results', cap, sideBtn('credit', 'How patients are credited'))}
+    <div class="ch-h"><span>Channel</span><span class="r">Spent</span><span class="r">Leads</span><span class="r">Booked</span><span class="r">Became patients</span><span class="r">Paid so far</span><span class="r">Return on spend</span></div>
+    ${rows.map(x => `<button class="ch-r" data-side="mkt:${x.k}"><span class="nm">${esc(x.label)}${x.cpnp ? `<small>${$(x.cpnp)} per new patient</small>` : ''}</span>
+      <span class="r ${x.spend ? '' : 'muted'} hide">${x.spend ? $(x.spend) : x.paid ? '—' : 'Free'}</span><span class="r hide">${x.leads || '—'}</span><span class="r hide">${x.booked || '—'}</span>
+      <span class="r np">${x.np || '—'}</span><span class="r hide">${x.coll ? $(x.coll) : '—'}</span><span class="cost">${x.roi ? `${x.roi.toFixed(1)}×` : ''}</span></button>`).join('')}
+    <div class="foot">Became patients: confirmed first visit in OpenDental after the lead came in. Paid so far: their patient and insurance payments. Spend is ad cost only.${need.length ? ` LSA spend is not entered for ${need.map(mFull).join(', ')}, so LSA cost and return read off until it is added.` : ''}</div></div>`;
+}
+function rankCard() {
+  const L = rankList(), show = S.rankAll ? L : L.slice(0, 6), p1 = L.filter(x => x.pos <= 10.5).length;
+  const row = x => { const d = x.prev != null ? x.prev - x.pos : null;
+    return `<div class="rk"><b class="${x.pos <= 10.5 ? 'p1' : ''}">#${Math.round(x.pos)}</b><span>${esc(x.q)}<small>${n0(x.i)} times seen, ${n0(x.c)} visits</small></span>
+      <em class="${d == null || Math.abs(d) < 1 ? '' : d > 0 ? 'up' : 'down'}">${d == null ? 'New' : Math.abs(d) < 1 ? 'Steady' : `${d > 0 ? '▲' : '▼'} ${Math.round(Math.abs(d))} in 4 weeks`}</em>${rankSpark(x.q)}</div>`; };
+  return `<div class="card c8">${cardHead('Where the website ranks on Google', `${p1} of the ${L.length} searches people use most to find the site are on page one. #1 is the top result.`)}
+    ${L.length ? show.map(row).join('') : '<p class="cap" style="margin-top:10px">Not enough search data yet.</p>'}
+    ${L.length > 6 ? `<button class="more" data-rankall="1">${S.rankAll ? 'Show fewer' : `Show all ${L.length} searches`}</button>` : ''}
+    <p class="note2">Regular Google results, averaged over four weeks. Map listings are counted in the Google profile. The small line is the last 12 weeks; up is better.</p></div>`;
+}
+function profileCard(r) {
+  const pr = prior(), G = D.gbp?.daily || [], R = D.gbp?.reviews || { list: [] }, W = weeks12(), wk = f => W.map(x => f(x));
+  const gIn = (rr, i) => sum(G.filter(x => inR(x[0], rr)), x => x[i]);
+  const ch = (c, p) => (!p ? '' : `<em class="${c >= p ? 'good' : 'bad'}">${c >= p ? '▲' : '▼'} ${Math.round(Math.abs(c - p) / p * 100)}%</em>`);
+  const newRev = R.list.filter(x => inR(x[0], r)), low = newRev.filter(x => x[1] && x[1] <= 3).length;
+  return `<div class="card c4">${cardHead('Google profile', '', D.ig ? sideBtn('instagram', 'Instagram') : '')}
+    <div class="stat2"><div class="v"><b>${n0(R.total)}</b>${newRev.length ? `<em class="${low ? 'bad' : 'good'}">+${newRev.length}${low ? `, ${low} low` : ''}</em>` : '<em>No new reviews</em>'}</div><span>Google reviews${R.avg ? `, ${R.avg.toFixed(1)} stars` : ''}</span></div>
+    <div class="stat2"><div class="v"><b>${n0(gIn(r, 2))}</b>${ch(gIn(r, 2), gIn(pr, 2))}</div><span>Calls from the profile</span>${kspark(wk(x => gIn(x, 2)), '#4da8d3')}</div>
+    <div class="stat2"><div class="v"><b>${n0(gIn(r, 3))}</b>${ch(gIn(r, 3), gIn(pr, 3))}</div><span>Direction requests</span>${kspark(wk(x => gIn(x, 3)), '#4da8d3')}</div>
+    <div class="stat2"><div class="v"><b>${n0(gIn(r, 4))}</b>${ch(gIn(r, 4), gIn(pr, 4))}</div><span>Website visits from the profile</span></div></div>`;
+}
+
+// ----- Money: what was produced, what was banked, what is still owed or waiting
+function moneyView() {
+  const r = range(), T = practiceIn(r), Q = hasPrior() ? practiceIn(prior()) : null, M = months12(), p = PR(), s = snap();
+  const rate = T.collRate != null ? T.collRate : per(T.coll, T.prod);
+  const head = `${$k(T.coll)} collected on ${$k(T.prod)} produced.`;
+  const tag = `${pct(rate)} of production${T.collRate != null ? ' after insurance write-offs. The usual target is 98%.' : '.'}`;
+  const mm = M.map(m => ({ m, ...practiceIn(mRange(m)) })), mx = Math.max(1, ...mm.map(x => Math.max(x.prod, x.coll))), Wd = 760, H = 160, gw = Wd / 12, bw = Math.min(16, gw * .28);
+  let ch = `<svg class="chart" viewBox="0 0 ${Wd} ${H + 20}" role="img" aria-label="Production and collections by month">`;
+  mm.forEach((x, i) => { const c = i * gw + gw / 2, hp = x.prod / mx * (H - 10), hc = x.coll / mx * (H - 10);
+    ch += `<g data-side="k:prod" style="cursor:pointer"><rect x="${i * gw}" y="0" width="${gw}" height="${H}" fill="transparent"/><rect x="${c - bw - 1}" y="${H - hp}" width="${bw}" height="${hp}" rx="2" fill="#152449"/><rect x="${c + 1}" y="${H - hc}" width="${bw}" height="${hc}" rx="2" fill="#4da8d3"/><title>${ml(x.m)}: ${$(x.prod)} produced, ${$(x.coll)} collected</title></g><text x="${c}" y="${H + 15}" text-anchor="middle" font-size="11" fill="#8491a7" font-family="Urbanist">${ms(x.m)}</text>`; });
+  ch += `<line x1="0" y1="${H}" x2="${Wd}" y2="${H}" stroke="#dce8f4"/></svg>`;
+  const trend = `<div class="card c8">${cardHead('Production and collections by month', '', sideBtn('k:prod', 'Month by month'))}<div class="legend"><span><i style="background:#152449"></i>Produced</span><span><i style="background:#4da8d3"></i>Collected</span></div>${ch}</div>`;
+  const cl = p.claims || [], insOut = sum(cl.filter(x => x[0] !== 'unsent'), x => x[2]);
+  const owed = s.arTotal != null ? `<button class="card c4 mini" data-side="owed"><h3>Owed to the practice</h3><span class="big">${$k(s.arTotal)}</span><p>by patients${s.ar90 ? `, ${$k(s.ar90)} of it over 90 days` : ''}.</p>
+      <div class="stack">${[['arCurrent', '#4da8d3'], ['ar31', '#8fcbe6'], ['ar61', '#e0b35c'], ['ar90', '#c24a33']].map(([k, c]) => s[k] > 0 ? `<i style="flex:${s[k]};background:${c}"></i>` : '').join('')}</div>
+      <p>${insOut ? `Plus ${$k(insOut)} billed to insurance and not yet paid.` : ''}</p><span class="go2">Aging detail</span></button>`
+    : `<div class="card c4"><h3>Owed to the practice</h3>${soon('Patient balances and unpaid insurance')}</div>`;
+  const ps = provsIn(r), pmx = Math.max(1, ...ps.map(x => x.prod)), hs = hygShareIn(r);
+  const prov = `<div class="card c6">${cardHead('By provider', `Completed treatment${ps.some(x => x.perDay) ? ', and per day worked' : ''}.`, sideBtn('carriers', 'Insurance plans'))}
+    ${ps.map(x => `<button class="b3" data-side="prov:${x.k}"><span>${esc(x.name)}${x.hyg ? '<span class="pill">Hygiene</span>' : ''}${x.perDay ? `<small>${$(x.perDay)} per day</small>` : ''}</span><span class="t"><i class="n" style="width:${x.prod / pmx * 100}%"></i></span><b>${$k(x.prod)}</b></button>`).join('')}
+    ${hs != null ? `<p class="note2">Hygiene is ${pct(hs)} of production. Many practices land between 25% and 33%.</p>` : ''}</div>`;
+  const ua = p.unschedAge || [], tx = txIn(r), planned = sum(tx, 'planned');
+  let wait;
+  if (ua.length) {
+    const rows = AGES.map(([k, l]) => ({ k, l, amt: sum(ua.filter(x => x[0] === k), x => x[2]), pats: sum(ua.filter(x => x[0] === k), x => x[3]) })), amx = Math.max(1, ...rows.map(x => x.amt));
+    wait = `<div class="card c6">${cardHead(`${$k(s.unschedAmount)} of treatment waiting`, `${pl(s.unschedPatients, 'patient')} with a plan and nothing scheduled, by how long it has waited.`, sideBtn('services', 'By service'))}
+      ${rows.map(x => `<div class="b3"><span>${x.l}<small>${n0(x.pats)} patients</small></span><span class="t"><i class="${x.k === 'a30' || x.k === 'a90' ? '' : 'n'}" style="width:${x.amt / amx * 100}%"></i></span><b>${$k(x.amt)}</b></div>`).join('')}
+      <p class="note2">${planned > 1000 ? `${pct(sum(tx, 'moving') / planned)} of treatment planned ${rangeWords()} is scheduled or done. ` : ''}Recent plans are the easiest to book.</p>${odp('tx')}</div>`;
+  } else wait = `<div class="card c6"><h3>${s.unschedAmount != null ? `${$k(s.unschedAmount)} of treatment waiting` : 'Treatment waiting'}</h3><p class="cap">${s.unschedPatients ? `${pl(s.unschedPatients, 'patient')} with a plan and nothing scheduled.` : ''}</p>${soon('How long it has waited')}${odp('tx')}</div>`;
+  return [head, tag, `<div class="grid">${trend}${owed}${prov}${wait}</div>`];
+}
+
+// ----- Chair & team: who needs a call, and how full the chairs are
+function teamView() {
+  const r = range(), s = snap(), h = hygIn(r), pe = perioIn(r), ca = chairAhead(), wd = weekdayIn(r), p = PR(), fu = followups(), W = weeks12(), T = practiceIn(r);
+  const head = fu.length ? `${pl(fu.length, 'list')} waiting on the team.` : 'Nothing is waiting on the team.';
+  const tag = h.rate != null ? `${pct(h.rate)} of hygiene patients left with their next visit booked.` : `${n0(s.recallOverdue)} patients are overdue for a cleaning.`;
+  const list = `<div class="panel">${fu.map(x => `<div class="act"><b class="${x.sev}">${typeof x.n === 'number' ? n0(x.n) : x.n}</b><div><h4>${esc(x.title)}</h4><p>${esc(x.why)}</p></div><div class="do">${x.act}</div></div>`).join('') || '<p style="padding:18px 22px">Nothing waiting.</p>'}</div>`;
+  const hw = W.map(([a]) => (p.hygiene || []).find(x => x[0] === a)).map(x => (x && x[1] ? x[2] / x[1] : null));
+  const rebook = h.rate != null ? `<div class="card c6">${cardHead('Hygiene rebooked before leaving', `Visits ${rangeWords()} with a later visit booked or done.`)}
+      <div class="bigv">${pct(h.rate)}<small>of ${n0(h.n)} visits</small></div>${meter(h.rate, TGT.rebook)}
+      ${pe.share != null ? `<p class="note2">Gum care was ${pct(pe.share)} of adult hygiene visits. A share well under 30% can mean gum disease going undiagnosed.</p>` : ''}</div>`
+    : `<div class="card c6"><h3>Hygiene rebooked before leaving</h3>${soon('The rebooking rate')}</div>`;
+  const hist = Object.entries(P().history || {}).sort().slice(-60);
+  const recall = `<div class="card c6">${cardHead('Recall', 'Patients due for a cleaning.')}
+      <div class="kv3"><div><b>${n0(s.recallOverdue)}</b><span>Overdue, not booked</span></div><div><b>${n0(s.recallDue30)}</b><span>Due in 30 days, not booked</span></div></div>
+      ${hist.length > 3 ? `<div style="margin-top:12px">${sparkMM(hist.map(([, v]) => v.recallOverdue), '#c24a33')}</div>` : '<p class="note2">A daily trend of overdue patients builds here from now on.</p>'}${odp('recall')}</div>`;
+  let chair;
+  if (ca && ca.list.length) {
+    const mx = Math.max(1, ...ca.list.map(x => Math.max(x.sched, x.booked)));
+    chair = `<div class="card c6">${cardHead('Chair time, next 4 weeks', ca.hasSched ? 'Hours booked against hours scheduled.' : 'Hours booked per provider.')}
+      ${ca.list.map(x => `<div class="b3"><span>${esc(x.name)}${x.hyg ? '<span class="pill">Hygiene</span>' : ''}<small>${n0(x.booked)} of ${x.sched ? n0(x.sched) : '?'} hours</small></span><span class="t">${x.sched ? `<i class="g" style="width:${x.sched / mx * 100}%"></i>` : ''}<i class="n" style="width:${x.booked / mx * 100}%"></i></span><b>${x.fill != null ? pct(x.fill) : n0(x.booked) + 'h'}</b></div>`).join('')}
+      <p class="note2">${ca.hasSched ? 'Under 70% two weeks out means room for new patients. Over 90% means patients are waiting.' : 'Scheduled hours appear once provider schedules are set in OpenDental.'}</p></div>`;
+  } else {
+    const fut = p.daily.filter(x => x[0] > D.asOf && x[0] <= shift(D.today, 28));
+    chair = `<div class="card c6">${cardHead('Visits booked, next 4 weeks', 'From the OpenDental schedule.')}${barChart([0, 1, 2, 3].map(i => { const a = shift(monday(D.today), 7 * i), n = sum(fut.filter(x => x[0] >= a && x[0] <= shift(a, 6)), x => x[6]); return { l: `Week of ${dl(a)}`, v: n, t: `${n} visits` }; }), '#4da8d3', 110)}</div>`;
+  }
+  const wmx = Math.max(0.01, ...wd.map(x => x.rate)), worst = [...wd].sort((a, b) => b.rate - a.rate)[0];
+  const missed = `<div class="card c6">${cardHead('Missed appointments by weekday', `${T.show != null ? `${pct(1 - T.show)} of appointments broke ${rangeWords()}.` : ''}`)}
+      ${wd.map(x => `<div class="b3"><span>${DOW[x.i]}<small>${n0(x.broken)} of ${n0(x.done + x.broken)}</small></span><span class="t"><i class="g" style="width:${x.rate / wmx * 100}%;${x === worst ? 'background:var(--bad)' : ''}"></i></span><b>${pct(x.rate)}</b></div>`).join('')}
+      ${worst ? `<p class="note2">${DOW[worst.i]} is the worst day, so a confirmation call the day before pays off most there.</p>` : ''}</div>`;
+  return [head, tag, `${list}<div class="grid" style="margin-top:16px">${rebook}${recall}${chair}${missed}</div><p class="note2" style="margin-top:14px"><button class="lk" data-side="health">GHL pipeline and data health</button></p>`];
+}
+
+// ---------- extra sidebars for what moved off the main views
+function sideSources() {
+  const r = range(), rows = sourcesIn(r).filter(x => x.np || x.leads);
+  title('Where new patients came from', RW());
+  const m = {}; for (const [wk, , sv, n] of P()?.leads.services || []) if (wkIn(wk, r)) m[sv] = (m[sv] || 0) + n;
+  const asked = Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  el('sbody').innerHTML = `${tbl(['Source', ['New patients', 1], ['Came back', 1], ['Paid each', 1]], rows.map(x => [esc(x.label), n0(x.np), x.np ? pct(x.ret / x.np) : '—', x.np ? $(x.coll / x.np) : '—']), rows.map(x => `class="go" data-side="src:${x.k}"`))}
+    <p class="s">"Not in GHL" is anyone who never came through GHL: walk-ins, calls answered at the desk, family of existing patients.</p>
+    ${asked.length ? `<h4>What leads asked for</h4>${tbl(['Service', ['Leads', 1]], asked.map(([k, n]) => [esc(cap1(k)), n]))}` : ''}`;
+}
+function sideCredit() {
+  const q = P().quality, r = range(), rows = marketingIn(r).filter(x => x.leads);
+  title('How patients are credited', 'Last 13 months');
+  el('sbody').innerHTML = `<p class="read">A channel gets credit only when its lead was in GHL before the patient's first visit, within a year of it, and OpenDental shows that first visit as completed.</p>
+    ${tbl(['Matched by', ['Patients', 1]], [['OpenDental patient ID', n0(q.patnum)], ['Phone number', n0(q.phone)], ['Email', n0(q.email)], ['Joined GHL after their first visit (not credited)', n0(q.leadAfterVisit)]])}
+    <h4>Leads by source, ${rangeWords()}</h4>${tbl(['Source', ['Leads', 1]], rows.map(x => [esc(x.label), n0(x.leads)]))}
+    <p class="s">Leads with no source in GHL can't be credited to anyone, so any error runs toward under-crediting. The credited patients can be listed on the practice's server for spot checks; names never leave it.</p>`;
+}
+function sideServices() {
+  const r = range(), cs = catsIn(r), tx = txIn(r), ua = PR().unschedAge || [];
+  const wait = {}; for (const [, c, a, n] of ua) { const t = (wait[c] ||= { amt: 0, pats: 0 }); t.amt += a; t.pats += n; }
+  title('By service', RW());
+  el('sbody').innerHTML = `<h4>Completed</h4>${tbl(['Service', ['Procedures', 1], ['Production', 1]], cs.map(x => [esc(CATS[x.k] || x.k), n0(x.n), $(x.amt)]), cs.map(x => `class="go" data-side="svc:${x.k}"`))}
+    ${Object.keys(wait).length ? `<h4>Waiting to be scheduled</h4>${tbl(['Service', ['Patients', 1], ['Amount', 1]], Object.entries(wait).sort((a, b) => b[1].amt - a[1].amt).map(([c, t]) => [esc(CATS[c] || c), n0(t.pats), $(t.amt)]))}` : ''}
+    ${tx.length ? `<h4>Follow-through on plans made ${rangeWords()}</h4>${tbl(['Service', ['Planned', 1], ['Scheduled or done', 1]], tx.map(x => [esc(CATS[x.k] || x.k), $(x.planned), pct(x.moving / Math.max(1, x.planned))]))}` : ''}`;
+}
+function sideCarriers() {
+  const cr = carriersIn(range());
+  title('Insurance plans', RW());
+  el('sbody').innerHTML = cr.length ? `<p class="read">What each plan was billed, paid, and what was written off. A high write-off share is the cost of staying in network.</p>${tbl(['Plan', ['Billed', 1], ['Paid', 1], ['Write-off', 1]], cr.map(x => [esc(x.k), $(x.billed), $(x.paid), pct(x.woRate)]), cr.map(x => `class="go" data-side="car:${encodeURIComponent(x.k)}"`))}` : soon('Write-offs by insurance plan');
+}
+function sideHealth() {
+  const p = P(), q = p.quality, stages = p.leads.openStages.slice(0, 10);
+  title('GHL pipeline and data health', 'Right now');
+  el('sbody').innerHTML = `<h4>Open opportunities by stage</h4>${tbl(['Stage', ['Open', 1]], stages.map(([n, c]) => [esc(n), c]))}${ghlBtn('opps', 'Open pipeline in GHL')}
+    <h4>How GHL and OpenDental line up, last 13 months</h4>${tbl(['', ['Count', 1]], [['New patients matched to a GHL lead', n0(q.patnum + q.phone + q.email)], ['New patients not in GHL', n0(q.none)], ['Leads in GHL', n0(q.leads)], ['Existing patients synced into GHL, not counted as leads', n0(q.syncContactsExcluded)]])}
+    <p class="s">A required "How did you hear about us?" field in GHL is the single biggest fix for leads with no source.</p>`;
+}
+
+// ----- Overview
 function bridgeCard(b) {
   const p = PR(), M = months12();
   if (!b) {
     const nw = M.map(m => sum(p.daily.filter(x => x[0].startsWith(m)), x => x[7]));
-    return `<h3>Patients coming in</h3><p class="cap">New patients by month. The full picture of patients gained and lost arrives with the droplet's next update.</p>${barChart(M.map((m, i) => ({ l: ms(m), v: nw[i], t: `${ml(m)}: ${nw[i]} new patients` })), '#4da8d3')}`;
+    const seen = p.seenMonthly?.length ? M.map(m => (p.seenMonthly.find(x => x[0] === m) || [0, 0])[1]) : null;
+    const why = p.firstRecord ? `OpenDental's treatment history starts in ${ml(p.firstRecord.slice(0, 7))}, so active patients and lapsed patients can't be counted fairly until ${ml(fullFrom())}.` : 'Active and lapsed patients appear once the droplet confirms how far OpenDental history goes back.';
+    if (!seen) return `<h3>Patients coming in</h3><p class="cap">New patients by month. ${why}</p>${barChart(M.map((m, i) => ({ l: ms(m), v: nw[i], t: `${ml(m)}: ${nw[i]} new patients` })), '#4da8d3')}`;
+    const W = 760, H = 170, gw = W / 12, bw = Math.min(36, gw * .58), mx = Math.max(1, ...seen);
+    let svg = `<svg class="chart" viewBox="0 -16 ${W} ${H + 36}" role="img" aria-label="Patients seen and new patients by month">`;
+    M.forEach((m, i) => { const px = i * gw + (gw - bw) / 2, hs = seen[i] / mx * (H - 6), hn = Math.min(nw[i], seen[i]) / mx * (H - 6);
+      svg += `<g data-side="k:active"><rect x="${px}" y="${H - hs}" width="${bw}" height="${hs}" rx="3" fill="#cfe6f3"/><rect x="${px}" y="${H - hn}" width="${bw}" height="${hn}" rx="3" fill="#4da8d3"/><title>${ml(m)}: ${seen[i]} patients seen, ${nw[i]} of them new</title></g>
+        <text x="${px + bw / 2}" y="${H - hs - 5}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#25385c" font-family="Urbanist">${seen[i] || ''}</text><text x="${px + bw / 2}" y="${H + 15}" text-anchor="middle" font-size="11" fill="#8491a7" font-family="Urbanist">${ms(m)}</text>`; });
+    svg += `<line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="#dce8f4"/></svg>`;
+    const last3 = sum(seen.slice(-4, -1), x => x), prev3 = sum(seen.slice(-7, -4), x => x);
+    return `${cardHead('Patients seen each month', `Different patients with a completed visit, and how many were new.${prev3 ? ` The last three full months saw ${pct(Math.abs(last3 - prev3) / prev3)} ${last3 >= prev3 ? 'more' : 'fewer'} patients than the three before.` : ''}`, sideBtn('k:active', 'Month by month'))}
+      <div class="legend" style="margin-top:6px"><span><i style="background:#cfe6f3"></i>Returning patients</span><span><i style="background:#4da8d3"></i>New patients</span></div>${svg}<p class="note2">${why}</p>`;
   }
   const net = b.end - b.start;
   const sumRow = `<div class="bridge-sum"><div><b>${n0(b.start)}</b><span>Active in ${ml(b.startM)}</span></div><div class="op">+</div>
@@ -492,7 +692,7 @@ function bridgeCard(b) {
   const rows = b.rows, W = 760, H = 190, mid = 118, gw = W / rows.length, bw = Math.min(34, gw * .55);
   const up = Math.max(1, ...rows.map(x => x.nw + x.back)), dn = Math.max(1, ...rows.map(x => x.lapsed)), sc = Math.max(up, dn * 1.6);
   const yU = v => v / sc * (mid - 14), yD = v => v / sc * (mid - 14);
-  const amin = Math.min(...rows.map(x => x.active)), amax = Math.max(...rows.map(x => x.active)), yA = v => 16 + (1 - (v - amin) / Math.max(1, amax - amin)) * (mid - 40);
+  const amin = Math.min(...rows.map(x => x.active)), amax = Math.max(...rows.map(x => x.active)), yA = v => 30 + (1 - (v - amin) / Math.max(1, amax - amin)) * (mid - 52);
   let s = `<svg class="chart" viewBox="0 0 ${W} ${H + 18}" role="img" aria-label="Patients gained and lost by month, with active patients">`;
   rows.forEach((x, i) => { const cx = i * gw + gw / 2, x0 = cx - bw / 2;
     s += `<g class="bm" data-side="k:active"><rect x="${i * gw}" y="0" width="${gw}" height="${H}" fill="transparent"/>`;
@@ -516,102 +716,17 @@ function barChart(items, color, H = 150) {
 function todayCard() {
   const fu = followups().slice(0, 5);
   return `<div class="card c4"><h3>Waiting on the team</h3><p class="cap">Right now, across GHL and OpenDental.</p><div style="margin-top:6px">
-    ${fu.map(x => `<button class="titem" data-tab="followups"><b class="${x.sev}">${typeof x.n === 'number' ? n0(x.n) : x.n}</b><span>${esc(x.title)}</span></button>`).join('') || '<p class="cap" style="margin-top:10px">Nothing waiting.</p>'}
-    </div><button class="more" data-tab="followups">All follow-ups</button></div>`;
+    ${fu.map(x => `<button class="titem" data-tab="team"><b class="${x.sev}">${typeof x.n === 'number' ? n0(x.n) : x.n}</b><span>${esc(x.title)}</span></button>`).join('') || '<p class="cap" style="margin-top:10px">Nothing waiting.</p>'}
+    </div><button class="more" data-tab="team">All follow-ups</button></div>`;
 }
-function miniCards() {
-  const s = snap(), r = range(), h = hygIn(r), tx = txIn(r), ca = chairAhead(), p = PR();
-  const T = rankList(), p1 = T.filter(x => x.pos <= 10.5).length;
-  const planned = sum(tx, 'planned');
-  const fut = p.daily.filter(x => x[0] > D.asOf && x[0] <= shift(D.today, 14)), booked14 = sum(fut, x => x[6]);
-  const fill = ca?.hasSched ? sum(ca.list, 'booked') / Math.max(1, sum(ca.list, 'sched')) : null;
-  return `<button class="card c3 mini" data-tab="treatment"><h3>Treatment waiting</h3><span class="big">${s.unschedAmount != null ? $k(s.unschedAmount) : '—'}</span><p>${s.unschedPatients ? `${pl(s.unschedPatients, 'patient')} with nothing scheduled.` : ''}${planned > 0 ? ` ${pct(sum(tx, 'moving') / planned)} of recent plans are moving.` : ''}</p><span class="go2">Treatment</span></button>
-    <button class="card c3 mini" data-tab="hygiene"><h3>Hygiene</h3><span class="big">${h.rate != null ? pct(h.rate) : n0(s.recallOverdue)}</span><p>${h.rate != null ? `of hygiene patients rebooked. ${n0(s.recallOverdue)} overdue for a cleaning.` : 'patients overdue for a cleaning.'}</p><span class="go2">Hygiene & schedule</span></button>
-    <button class="card c3 mini" data-tab="hygiene"><h3>Schedule ahead</h3><span class="big">${fill != null ? pct(fill) : n0(booked14)}</span><p>${fill != null ? `of chair time booked over the next 4 weeks.` : `visits booked in the next 14 days.`}</p>${minibars(Array.from({ length: 14 }, (_, i) => sum(p.daily.filter(x => x[0] === shift(D.today, i)), x => x[6])))}<span class="go2">See the schedule</span></button>
-    <button class="card c3 mini" data-tab="visibility"><h3>Found on Google</h3><span class="big">${p1} of ${T.length}</span><p>top searches on page one.</p><span class="go2">Online presence</span></button>`;
-}
-
 // ----- New patients
-function patientsView() {
-  const r = range(), T = practiceIn(r), Q = hasPrior() ? practiceIn(prior()) : null, rows = sourcesIn(r), p = PR(), M = months12();
-  const npTot = sum(rows, 'np'), ret = sum(rows, 'ret');
-  const head = `${pl(T.np, 'new patient')} ${rangeWords()}.`;
-  const tag = V2() && npTot ? `${pct(ret / npTot)} have come back for a second visit so far.` : Q ? `${T.np >= Q.np ? 'Up' : 'Down'} from ${Q.np} in ${priorWords()}.` : '';
-  // monthly chart, stacked by source when available
-  const byM = M.map(m => { const rr = mRange(m), n = sum(p.daily.filter(x => x[0].startsWith(m)), x => x[7]); return { m, n, src: V2() ? sourcesIn(rr) : [] }; });
-  const Wd = 760, H = 150, gw = Wd / 12, bw = Math.min(38, gw * .6), mx = Math.max(1, ...byM.map(x => x.n));
-  let chart = `<svg class="chart" viewBox="0 0 ${Wd} ${H + 20}" role="img" aria-label="New patients by month">`;
-  byM.forEach((x, i) => { const px = i * gw + (gw - bw) / 2; let y = H; const tot = sum(x.src, 'np') || x.n;
-    if (x.src.length) for (const s2 of x.src) { if (!s2.np) continue; const hh = s2.np / mx * (H - 20) * (x.n / tot); y -= hh; chart += `<rect x="${px}" y="${y}" width="${bw}" height="${hh}" fill="${s2.color}"><title>${ml(x.m)}: ${s2.np} from ${esc(s2.label)}</title></rect>`; }
-    else { const hh = x.n / mx * (H - 20); y -= hh; chart += `<rect x="${px}" y="${y}" width="${bw}" height="${hh}" rx="3" fill="#4da8d3"><title>${ml(x.m)}: ${x.n} new patients</title></rect>`; }
-    chart += `<text x="${px + bw / 2}" y="${y - 5}" text-anchor="middle" font-size="11.5" font-weight="700" fill="#25385c" font-family="Urbanist">${x.n || ''}</text><text x="${px + bw / 2}" y="${H + 15}" text-anchor="middle" font-size="11" fill="#8491a7" font-family="Urbanist">${ms(x.m)}</text>`; });
-  chart += `<line x1="0" y1="${H}" x2="${Wd}" y2="${H}" stroke="#dce8f4"/></svg>`;
-  const used = [...new Set(byM.flatMap(x => x.src.filter(s2 => s2.np).map(s2 => s2.k)))];
-  const trend = `<div class="card c8"><h3>New patients by month</h3><p class="cap">A patient's first completed visit, as OpenDental flags it.${used.length ? ' Colored by where they came from.' : ''}</p>
-    ${used.length ? `<div class="legend" style="margin-top:8px">${used.map(k => `<span><i style="background:${CH[k].color}"></i>${esc(chLabel(k))}</span>`).join('')}</div>` : ''}${chart}</div>`;
-  const fut = p.daily.filter(x => x[0] > D.asOf), nb14 = sum(fut.filter(x => x[0] <= shift(D.today, 14)), x => x[8]), nb30 = sum(fut.filter(x => x[0] <= shift(D.today, 30)), x => x[8]);
-  const ahead = `<div class="card c4"><h3>New patients booked ahead</h3><p class="cap">First visits on the OpenDental schedule.</p>
-    <div class="kv3"><div><b>${n0(nb14)}</b><span>Next 14 days</span></div><div><b>${n0(nb30)}</b><span>Next 30 days</span></div></div>
-    <p class="note2">${T.np ? `At the pace ${rangeWords()}, about ${n0(T.np / S.win * 30)} a month come in.` : ''}</p>${odp('np')}</div>`;
-  // sources table
-  const mx2 = Math.max(1, ...rows.map(x => x.np));
-  const src = V2() ? `<div class="card c6"><div class="top2"><div><h3>Where they came from</h3><p class="cap">Each new patient matched to their lead in GHL by phone, email or patient ID. Select one for detail.</p></div></div>
-    ${rows.filter(x => x.np).map(x => `<button class="b3" data-side="src:${x.k}"><span>${esc(x.label)}<small>${x.np ? `${pct(x.ret / x.np)} came back, ${$k(x.coll / x.np)} each so far` : ''}</small></span><span class="t"><i style="width:${x.np / mx2 * 100}%;background:${x.color}"></i></span><b>${x.np}</b></button>`).join('') || '<p class="cap">No new patients in this period.</p>'}
-    <p class="note2">"Not in GHL" means the patient never came through GHL: walk-ins, phone calls answered at the desk, or family of existing patients.</p></div>`
-    : `<div class="card c6"><h3>Where they came from</h3>${soon('The source of each new patient')}</div>`;
-  const q = P().quality;
-  const val = V2() ? (() => { const tot = sum(rows, 'np'), coll = sum(rows, 'coll'), plan = sum(rows, 'plan');
-    return `<div class="card c6"><h3>What a new patient is worth</h3><p class="cap">For patients whose first visit was ${rangeWords()}, so far.</p>
-      <div class="kv3"><div><b>${tot ? $(coll / tot) : '—'}</b><span>Collected per new patient</span></div><div><b>${tot ? $(plan / tot) : '—'}</b><span>More treatment planned per patient</span></div>
-      <div><b>${tot ? pct(ret / tot) : '—'}</b><span>Came back for a second visit</span></div><div><b>${$k(plan)}</b><span>Planned, not yet done</span></div></div>
-      <p class="note2">Recent patients have had less time to return and finish treatment, so these rise with time.</p></div>`; })()
-    : `<div class="card c6"><h3>What a new patient is worth</h3>${soon('Value and return visits per new patient')}</div>`;
-  // organic path
-  const G = D.gbp?.daily || [], gIn = i => sum(G.filter(x => inR(x[0], r)), x => x[i]), sc = sum((D.gsc?.daily || []).filter(x => inR(x[0], r)), x => x[1]);
-  const leads = sum(P().leads.weeks.filter(x => wkIn(x[0], r)), x => x[2]), booked = sum(P().leads.weeks.filter(x => wkIn(x[0], r)), x => x[3]);
-  const path = `<div class="card c12"><h3>How people find the practice</h3><p class="cap">With ads off, this is the whole path ${rangeWords()}. The first two come from Google, the rest from GHL and OpenDental.</p>
-    <div class="fun"><div><b>${n0(gIn(1))}</b><span>Views of the Google profile</span></div><div><b>${n0(gIn(2) + gIn(3) + gIn(4) + sc)}</b><span>Calls, directions and website visits from Google</span></div>
-    <div><b>${n0(leads)}</b><span>Leads in GHL</span></div><div><b>${n0(booked)}</b><span>Of those, booked a visit</span>${leads ? `<em>${pct(booked / leads)}</em>` : ''}</div>
-    <div><b>${n0(T.np)}</b><span>New patients seen</span></div></div></div>`;
-  return [head, tag, `<div class="grid">${trend}${ahead}${src}${val}${path}${servicesCard(r)}</div>`];
-}
-function servicesCard(r) {
-  const m = {}; for (const [wk, , sv, n] of P()?.leads.services || []) if (wkIn(wk, r)) m[sv] = (m[sv] || 0) + n;
-  const rows = Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 7), mx = Math.max(1, ...rows.map(x => x[1]));
-  return `<div class="c12 card"><h3>What people asked for</h3><p class="cap">The service on each lead in GHL ${rangeWords()}.</p>
-    <div style="margin-top:8px">${rows.length ? rows.map(([k, n]) => `<div class="b3"><span>${esc(cap1(k))}</span><span class="t"><i style="width:${n / mx * 100}%"></i></span><b>${n}</b></div>`).join('') : '<p class="cap" style="margin-top:10px">No service recorded on leads in this period.</p>'}</div></div>`;
-}
-
-
 // ----- Marketing results: leads followed through to OpenDental, by the week the lead came in
 function marketingIn(r) {
   const out = {}, get = k => (out[k] ||= { k, ...(CH[k] || { label: k }), spend: 0, leads: 0, booked: 0, np: 0, coll: 0 });
   for (const [d, ch, amt] of D.spend || []) if (inR(d, r)) get(ch).spend += amt;
   for (const x of P()?.leads.weeks || []) if (wkIn(x[0], r)) { const t = get(x[1]); t.leads += x[2]; t.booked += x[3]; t.np += x[6] || 0; t.coll += x[7] || 0; }
   return Object.values(out).filter(x => x.spend || x.leads).map(x => ({ ...x, cpnp: x.spend && x.np ? x.spend / x.np : null, roi: x.spend ? x.coll / x.spend : null }))
-    .sort((a, b) => (b.spend > 0) - (a.spend > 0) || b.coll - a.coll || b.leads - a.leads);
-}
-function marketingView() {
-  const r = range(), ok = V2() && (P().leads.weeks[0] || []).length >= 8;
-  if (!ok) return ['Marketing results', '', `<div class="card"><h3>Corrected results arrive with the droplet update</h3><p class="cap" style="margin-top:6px;max-width:70ch">The earlier version credited channels with patients who were already in OpenDental, so it overcounted new patients from LSA and Meta. The new count only credits a channel when its lead came in before the patient's first visit, and every patient is confirmed in OpenDental. Run the droplet update to see them.</p></div>`];
-  const rows = marketingIn(r), paid = rows.filter(x => x.spend > 0), spend = sum(paid, 'spend'), np = sum(paid, 'np'), coll = sum(paid, 'coll');
-  const head = spend ? `${$k(spend)} in ads brought ${pl(np, 'new patient')} who have paid ${$k(coll)} so far.` : `${pl(sum(rows, 'np'), 'new patient')} from tracked leads ${rangeWords()}.`;
-  const tag = spend && coll ? `That is ${(coll / spend).toFixed(1)}× the ad spend, and it keeps growing as treatment is completed.` : '';
-  const missing = (() => { const ent = D.lsa?.entered || [], lw = (P().leads.weeks || []).filter(x => x[1] === 'lsa' && x[2]);
-    const need = months12().filter(m => mw(m, r) > 0 && !ent.includes(m) && lw.some(x => x[0].slice(0, 7) === m)); return need.length ? `LSA spend is not entered for ${need.map(ml).join(', ')}, so LSA cost and return read off for this range until it is added to data/lsa-spend.json.` : ''; })();
-  const table = `<div class="panel"><div class="ch-h"><span>Channel</span><span class="r">Spent</span><span class="r">Leads</span><span class="r">Booked</span><span class="r">Became patients</span><span class="r">Paid so far</span><span class="r">Return on spend</span></div>
-    ${rows.map(x => `<button class="ch-r" data-side="mkt:${x.k}"><span class="nm">${esc(x.label)}${x.cpnp ? `<small>${$(x.cpnp)} per new patient</small>` : x.spend ? '' : '<small>No ad spend</small>'}</span>
-      <span class="r ${x.spend ? '' : 'muted'} hide">${x.spend ? $(x.spend) : 'Free'}</span><span class="r hide">${x.leads || '—'}</span><span class="r hide">${x.booked || '—'}</span>
-      <span class="r np">${x.np || '—'}</span><span class="r hide">${x.coll ? $(x.coll) : '—'}</span><span class="cost">${x.roi ? `${x.roi.toFixed(1)}×` : x.spend ? '—' : ''}</span></button>`).join('')}
-    <div class="foot">Each lead is followed from the week it came into GHL. "Became patients" counts only people OpenDental confirms had a first visit after the lead came in. "Paid so far" is patient and insurance payments from them. Spend is ad cost only, not the retainer.${missing ? ` ${missing}` : ''}</div></div>`;
-  const q = P().quality;
-  const how = `<div class="grid" style="margin-top:16px"><div class="card c6"><h3>How a patient gets credited</h3>
-      <div class="line"><span>Matched to the lead by OpenDental patient ID</span><b>${n0(q.patnum)}</b></div><div class="line"><span>Matched by phone number</span><b>${n0(q.phone)}</b></div>
-      <div class="line"><span>Matched by email</span><b>${n0(q.email)}</b></div><div class="line"><span>Became a GHL contact after their first visit, so not credited</span><b>${n0(q.leadAfterVisit)}</b></div>
-      <p class="note2">Last 13 months. Anyone can spot-check the credited patients on the practice's server; names never leave it.</p></div>
-    <div class="card c6"><h3>Where leads came from</h3><p class="cap">Leads in GHL ${rangeWords()}, by source.</p>${(() => { const L = rows.filter(x => x.leads), mx = Math.max(1, ...L.map(x => x.leads)); return L.map(x => `<div class="b3"><span>${esc(x.label)}</span><span class="t"><i style="width:${x.leads / mx * 100}%;background:${x.color || '#4da8d3'}"></i></span><b>${x.leads}</b></div>`).join(''); })()}
-      <p class="note2">"No source in GHL" leads can't be credited to anyone. A required "How did you hear about us?" field closes most of that gap.</p></div></div>`;
-  return [head, tag, table + how];
+    .sort((a, b) => (!!b.paid - !!a.paid) || b.coll - a.coll || b.leads - a.leads);
 }
 function sideMkt(k) {
   const r = range(), x = marketingIn(r).find(y => y.k === k) || { spend: 0, leads: 0, booked: 0, np: 0, coll: 0 }, M = months12().slice().reverse();
@@ -623,117 +738,13 @@ function sideMkt(k) {
 }
 
 // ----- Production
-function productionView() {
-  const r = range(), T = practiceIn(r), Q = hasPrior() ? practiceIn(prior()) : null, M = months12(), p = PR(), s = snap();
-  const head = `${$k(T.prod)} produced, ${$k(T.coll)} collected.`;
-  const tag = T.collRate != null ? `Collections are ${pct(T.collRate)} of production after insurance write-offs.` : Q ? `Production ${T.prod >= Q.prod ? 'up' : 'down'} ${pct(Math.abs(T.prod - Q.prod) / Math.max(1, Q.prod))} vs ${priorWords()}.` : '';
-  // production vs collections by month
-  const mm = M.map(m => ({ m, ...practiceIn(mRange(m)) })), mx = Math.max(1, ...mm.map(x => Math.max(x.prod, x.coll))), Wd = 760, H = 160, gw = Wd / 12, bw = Math.min(16, gw * .28);
-  let ch = `<svg class="chart" viewBox="0 0 ${Wd} ${H + 20}" role="img" aria-label="Production and collections by month">`;
-  mm.forEach((x, i) => { const c = i * gw + gw / 2, hp = x.prod / mx * (H - 16), hc = x.coll / mx * (H - 16);
-    ch += `<g data-side="k:prod" style="cursor:pointer"><rect x="${i * gw}" y="0" width="${gw}" height="${H}" fill="transparent"/><rect x="${c - bw - 1}" y="${H - hp}" width="${bw}" height="${hp}" rx="2" fill="#152449"/><rect x="${c + 1}" y="${H - hc}" width="${bw}" height="${hc}" rx="2" fill="#4da8d3"/><title>${ml(x.m)}: ${$(x.prod)} produced, ${$(x.coll)} collected</title></g><text x="${c}" y="${H + 15}" text-anchor="middle" font-size="11" fill="#8491a7" font-family="Urbanist">${ms(x.m)}</text>`; });
-  ch += `<line x1="0" y1="${H}" x2="${Wd}" y2="${H}" stroke="#dce8f4"/></svg>`;
-  const trend = `<div class="card c8"><h3>Production and collections by month</h3><p class="cap">Completed treatment at full fee, and money received from patients and insurance.</p>
-    <div class="legend" style="margin-top:8px"><span><i style="background:#152449"></i>Produced</span><span><i style="background:#4da8d3"></i>Collected</span></div>${ch}</div>`;
-  // money owed
-  const cl = p.claims || [], insOut = sum(cl.filter(x => x[0] !== 'unsent'), x => x[2]);
-  const owed = s.arTotal != null || cl.length ? `<button class="card c4 mini" data-side="owed" style="cursor:pointer"><h3>Money owed to the practice</h3>
-      <span class="big">${$k((s.arTotal || 0))}</span><p>owed by patients${s.ar90 ? `, ${$k(s.ar90)} of it over 90 days` : ''}.</p>
-      ${s.arTotal ? `<div class="stack">${[['arCurrent', '#4da8d3'], ['ar31', '#8fcbe6'], ['ar61', '#e0b35c'], ['ar90', '#c24a33']].map(([k, c]) => s[k] > 0 ? `<i style="flex:${s[k]};background:${c}" title="${$(s[k])}"></i>` : '').join('')}</div>` : ''}
-      <p>${insOut ? `${$k(insOut)} billed to insurance and still unpaid.` : ''}</p><span class="go2">Aging detail</span></button>`
-    : `<div class="card c4"><h3>Money owed to the practice</h3>${soon('Patient balances and unpaid insurance')}</div>`;
-  // providers
-  const ps = provsIn(r), pmx = Math.max(1, ...ps.map(x => x.prod));
-  const prov = `<div class="card c6"><h3>By provider</h3><p class="cap">Completed treatment ${rangeWords()}${ps.some(x => x.perDay) ? ', and production per day they worked' : ''}. Select one for detail.</p>
-    ${ps.map(x => `<button class="b3" data-side="prov:${x.k}"><span>${esc(x.name)}${x.hyg ? '<span class="pill">Hygiene</span>' : ''}<small>${x.perDay ? `${$(x.perDay)} per day, ${n0(x.days)} days` : ''}</small></span><span class="t"><i class="n" style="width:${x.prod / pmx * 100}%"></i></span><b>${$k(x.prod)}</b></button>`).join('')}
-    ${(() => { const hs = hygShareIn(r); return hs != null ? `<p class="note2">Hygiene is ${pct(hs)} of production. Many practices land between 25% and 33%.</p>` : ''; })()}</div>`;
-  // services
-  const cs = catsIn(r), cmx = Math.max(1, ...cs.map(x => x.amt));
-  const svc = `<div class="card c6"><h3>By service</h3><p class="cap">Grouped by procedure code. Select one for its procedures and treatment plans.</p>
-    ${cs.slice(0, 9).map(x => `<button class="b3" data-side="svc:${x.k}"><span>${esc(CATS[x.k] || x.k)}<small>${n0(x.n)} procedures</small></span><span class="t"><i style="width:${x.amt / cmx * 100}%"></i></span><b>${$k(x.amt)}</b></button>`).join('')}</div>`;
-  // insurance plans
-  const cr = carriersIn(r);
-  const ins = cr.length ? `<div class="card c12"><h3>Insurance plans</h3><p class="cap">What each plan was billed, what it paid, and what the practice wrote off ${rangeWords()}. A high write-off share is the cost of staying in network.</p>
-    ${tbl(['Plan', ['Billed', 1], ['Paid', 1], ['Written off', 1], ['Write-off share', 1]], cr.slice(0, 10).map(x => [esc(x.k), $(x.billed), $(x.paid), $(x.wo), pct(x.woRate)]), cr.slice(0, 10).map(x => `class="go" data-side="car:${encodeURIComponent(x.k)}"`))}</div>`
-    : `<div class="card c12"><h3>Insurance plans</h3>${soon('Write-offs by insurance plan')}</div>`;
-  // top procedures
-  const cd = codesIn(r).slice(0, 10);
-  const top = cd.length ? `<div class="card c12"><h3>Top procedures</h3><p class="cap">By production ${rangeWords()}.</p>${tbl(['Code', 'Procedure', ['Count', 1], ['Production', 1]], cd.map(x => [esc(x.code), esc(x.d), n0(x.n), $(x.amt)]))}${odp('prod')}</div>` : '';
-  return [head, tag, `<div class="grid">${trend}${owed}${prov}${svc}${ins}</div>`];
-}
-
 // ----- Treatment
-function treatmentView() {
-  const r = range(), s = snap(), p = PR(), tx = txIn(r), ua = p.unschedAge || [];
-  const head = s.unschedAmount != null ? `${$k(s.unschedAmount)} of diagnosed treatment is waiting.` : 'Treatment plans and follow-through.';
-  const planned = sum(tx, 'planned'), moving = sum(tx, 'moving');
-  const tag = s.unschedPatients ? `${pl(s.unschedPatients, 'patient')} have treatment planned in the last 18 months and nothing scheduled.` : '';
-  const flow = tx.length ? `<div class="card c6"><h3>Follow-through on new plans</h3><p class="cap">Treatment planned ${rangeWords()}, and where it stands now. Same-day work is left out.</p>
-      <div class="bigv">${pct(moving / Math.max(1, planned))}<small>scheduled or done</small></div>
-      <div class="stack"><i style="flex:${sum(tx, 'done')};background:#152449" title="Done"></i><i style="flex:${sum(tx, 'sched')};background:#4da8d3" title="Scheduled"></i><i style="flex:${sum(tx, 'open')};background:#dce8f4" title="Not scheduled"></i></div>
-      <div class="legend"><span><i style="background:#152449"></i>Done ${$k(sum(tx, 'done'))}</span><span><i style="background:#4da8d3"></i>Scheduled ${$k(sum(tx, 'sched'))}</span><span><i style="background:#dce8f4"></i>Not scheduled ${$k(sum(tx, 'open'))}</span></div>
-      ${tbl(['Service', ['Planned', 1], ['Moving', 1]], tx.slice(0, 8).map(x => [esc(CATS[x.k] || x.k), $(x.planned), pct(x.moving / Math.max(1, x.planned))]), tx.slice(0, 8).map(x => `class="go" data-side="svc:${x.k}"`))}</div>`
-    : `<div class="card c6"><h3>Follow-through on new plans</h3>${soon('How much planned treatment gets scheduled')}</div>`;
-  let age = '';
-  if (ua.length) {
-    const tot = sum(ua, x => x[2]), rows = AGES.map(([k, l]) => ({ k, l, amt: sum(ua.filter(x => x[0] === k), x => x[2]), pats: sum(ua.filter(x => x[0] === k), x => x[3]) })), mx = Math.max(1, ...rows.map(x => x.amt));
-    age = `<div class="card c6"><h3>How long it has waited</h3><p class="cap">Unscheduled treatment by the age of the plan. Recent plans are the easiest to book, since the conversation is still fresh.</p>
-      ${rows.map(x => `<div class="b3"><span>${x.l}<small>${n0(x.pats)} patients</small></span><span class="t"><i class="${x.k === 'a30' || x.k === 'a90' ? '' : 'n'}" style="width:${x.amt / mx * 100}%"></i></span><b>${$k(x.amt)}</b></div>`).join('')}
-      <p class="note2">${pct((rows[0].amt + rows[1].amt) / Math.max(1, tot))} of it was planned in the last 3 months.</p>${odp('tx')}</div>`;
-  } else age = `<div class="card c6"><h3>How long it has waited</h3>${soon('Unscheduled treatment by age')}${odp('tx')}</div>`;
-  let big = '';
-  if (ua.length) {
-    const bc = {}; for (const [, c, a, n] of ua) { const t = (bc[c] ||= { amt: 0, pats: 0 }); t.amt += a; t.pats += n; }
-    const rows = Object.entries(bc).sort((a, b) => b[1].amt - a[1].amt), mx = Math.max(1, ...rows.map(x => x[1].amt));
-    big = `<div class="card c12"><h3>What is waiting, by service</h3><p class="cap">The largest cases first. Patient counts can overlap when one patient has several.</p>
-      ${rows.map(([c, t]) => `<button class="b3" data-side="svc:${c}"><span>${esc(CATS[c] || c)}<small>${n0(t.pats)} patients, about ${$(t.amt / Math.max(1, t.pats))} each</small></span><span class="t"><i class="${BIG.includes(c) ? 'n' : ''}" style="width:${t.amt / mx * 100}%"></i></span><b>${$k(t.amt)}</b></button>`).join('')}</div>`;
-  }
-  return [head, tag, `<div class="grid">${flow}${age}${big}</div>`];
-}
-
 // ----- Hygiene & schedule
 function meter(v, target, band) {
   const w = Math.max(0, Math.min(1, v || 0)) * 100;
   return `<div class="meter"><i style="width:${w}%"></i>${band ? `<span class="band" style="left:${band[0] * 100}%;width:${(band[1] - band[0]) * 100}%"></span>` : ''}${target != null ? `<span class="tk" style="left:${target * 100}%"></span>` : ''}</div><div class="mlab"><span>0%</span><span>${band ? `Typical ${pct(band[0])}–${pct(band[1])}` : `Target ${pct(target)}`}</span><span>100%</span></div>`;
 }
-function hygieneView() {
-  const r = range(), s = snap(), h = hygIn(r), pe = perioIn(r), hs = hygShareIn(r), ca = chairAhead(), wd = weekdayIn(r), p = PR(), W = weeks12();
-  const head = h.rate != null ? `${pct(h.rate)} of hygiene patients have their next visit booked.` : `${n0(s.recallOverdue)} patients are overdue for a cleaning.`;
-  const tag = h.rate != null ? `${n0(s.recallOverdue)} are overdue for a cleaning, and ${n0(s.recallDue30)} more come due in 30 days.` : `${n0(s.recallDue30)} more come due in the next 30 days.`;
-  const hw = W.map(([a]) => (p.hygiene || []).find(x => x[0] === a)).map(x => (x && x[1] ? x[2] / x[1] : null));
-  const rebook = h.rate != null ? `<div class="card c4"><h3>Rebooked before leaving</h3><p class="cap">Hygiene visits ${rangeWords()} where the patient has a later visit booked or done.</p>
-      <div class="bigv">${pct(h.rate)}<small>of ${n0(h.n)} visits</small></div>${meter(h.rate, TGT.rebook)}${kspark(hw, '#4da8d3', 240, 34).replace('<svg', '<svg style="display:block;width:100%;height:34px;margin-top:12px"')}
-      <p class="note2">Every patient who leaves without a booking becomes a recall call later.</p></div>`
-    : `<div class="card c4"><h3>Rebooked before leaving</h3>${soon('The hygiene rebooking rate')}</div>`;
-  const hist = Object.entries(P().history || {}).sort().slice(-60);
-  const recall = `<div class="card c4"><h3>Recall</h3><p class="cap">Patients due for a cleaning, from OpenDental.</p>
-      <div class="kv3"><div><b>${n0(s.recallOverdue)}</b><span>Overdue, not booked</span></div><div><b>${n0(s.recallDue30)}</b><span>Due in 30 days, not booked</span></div>
-      <div><b>${n0(s.activePatients)}</b><span>Active patients</span></div><div><b>${s.activePatients ? pct(s.recallOverdue / s.activePatients) : '—'}</b><span>Of active patients overdue</span></div></div>
-      ${hist.length > 3 ? `<p class="cap" style="margin-top:12px">Overdue, last ${hist.length} days</p>${sparkMM(hist.map(([, v]) => v.recallOverdue), '#c24a33')}` : '<p class="note2">A trend builds here from today, one point per day.</p>'}${odp('recall')}</div>`;
-  const mix = pe.share != null || hs != null ? `<div class="card c4"><h3>Hygiene mix</h3><p class="cap">${rangeWords()[0].toUpperCase() + rangeWords().slice(1)}.</p>
-      ${pe.share != null ? `<div class="bigv">${pct(pe.share)}<small>gum care visits</small></div>${meter(pe.share, TGT.perio)}<p class="note2">Of ${n0(pe.prophy + pe.perio)} adult hygiene visits, ${n0(pe.perio)} were deep cleaning or gum maintenance. A low share can mean gum disease going undiagnosed.</p>` : ''}
-      ${hs != null ? `<p class="cap" style="margin-top:14px">Hygiene share of production: <b style="color:var(--ink)">${pct(hs)}</b></p>${meter(hs, null, TGT.hygShare)}` : ''}</div>`
-    : `<div class="card c4"><h3>Hygiene mix</h3>${soon('Gum care share and hygiene production')}</div>`;
-  let chair;
-  if (ca && ca.list.length) {
-    const mx = Math.max(1, ...ca.list.map(x => Math.max(x.sched, x.booked)));
-    chair = `<div class="card c6"><h3>Chair time, next 4 weeks</h3><p class="cap">${ca.hasSched ? 'Hours booked against hours each provider is scheduled to work' : 'Hours booked per provider'}, ${dl(ca.from)} to ${dl(ca.to)}.</p>
-      ${ca.list.map(x => `<div class="b3"><span>${esc(x.name)}${x.hyg ? '<span class="pill">Hygiene</span>' : ''}<small>${n0(x.booked)} of ${x.sched ? n0(x.sched) : '?'} hours</small></span><span class="t">${x.sched ? `<i class="g" style="width:${x.sched / mx * 100}%"></i>` : ''}<i class="n" style="width:${x.booked / mx * 100}%"></i></span><b>${x.fill != null ? pct(x.fill) : n0(x.booked) + 'h'}</b></div>`).join('')}
-      <p class="note2">${ca.hasSched ? 'A provider under 70% booked two weeks out has room for new patients. Over 90% means patients are waiting.' : 'Scheduled hours appear once provider schedules are set in OpenDental.'}</p></div>`;
-  } else {
-    const fut = p.daily.filter(x => x[0] > D.asOf && x[0] <= shift(D.today, 28));
-    chair = `<div class="card c6"><h3>Visits booked ahead</h3><p class="cap">From the OpenDental schedule, next 4 weeks.</p>${barChart([0, 1, 2, 3].map(i => { const a = shift(monday(D.today), 7 * i), n = sum(fut.filter(x => x[0] >= a && x[0] <= shift(a, 6)), x => x[6]); return { l: `Week of ${dl(a)}`, v: n, t: `${n} visits` }; }), '#4da8d3', 120)}${soon('Booked hours against scheduled hours')}</div>`;
-  }
-  const wmx = Math.max(0.01, ...wd.map(x => x.rate)), worst = [...wd].sort((a, b) => b.rate - a.rate)[0];
-  const T = practiceIn(r);
-  const missed = `<div class="card c6"><h3>Missed appointments</h3><p class="cap">Broken appointments as a share of the schedule, by weekday, ${rangeWords()}.</p>
-      ${wd.map(x => `<div class="b3"><span>${DOW[x.i]}<small>${n0(x.broken)} of ${n0(x.done + x.broken)}</small></span><span class="t"><i class="${x === worst ? '' : 'g'}" style="width:${x.rate / wmx * 100}%;${x === worst ? 'background:var(--bad)' : ''}"></i></span><b>${pct(x.rate)}</b></div>`).join('')}
-      <p class="note2">${T.show != null ? `${pct(1 - T.show)} of appointments broke overall. ` : ''}${worst ? `${DOW[worst.i]} is the worst day, so a confirmation call the day before pays off most there.` : ''}</p>${odp('broken')}</div>`;
-  return [head, tag, `<div class="grid">${rebook}${recall}${mix}${chair}${missed}</div>`];
-}
-
 // ----- Online presence (was Reputation)
-const RKC = ['#152449', '#4da8d3', '#06aad7', '#3e5a8c', '#9aa9c0'];
 function rankList() {
   const G = D.gsc || {}, seen = new Set(), items = [];
   for (const x of [...(G.tracked || []), ...(G.top || [])]) { if (x.pos == null || x.brand || seen.has(x.q) || (x.i || 0) < 10) continue; seen.add(x.q); items.push(x); }
@@ -745,67 +756,7 @@ function rankSpark(q) {
   const pts = p.map((v, i) => (v == null ? null : `${(i * step).toFixed(1)},${y(v).toFixed(1)}`)).filter(Boolean);
   return `<svg viewBox="0 0 ${w} ${h}" style="width:90px;height:24px" aria-hidden="true"><polyline points="${pts.join(' ')}" fill="none" stroke="#4da8d3" stroke-width="1.8"/></svg>`;
 }
-function rankChart() {
-  const L = rankList();
-  if (!L.length) return '<p class="cap" style="margin-top:10px">Not enough search data yet.</p>';
-  const grp = [['Page one', x => x.pos <= 10.5], ['Page two, within reach', x => x.pos > 10.5 && x.pos <= 20.5], ['Further back', x => x.pos > 20.5]];
-  return grp.map(([t, f]) => { const g = L.filter(f); if (!g.length) return '';
-    return `<p class="cap" style="margin:14px 0 2px;font-weight:700;color:var(--ink2)">${t}</p>${g.map(x => { const d = x.prev != null ? x.prev - x.pos : null;
-      return `<div class="rk"><b class="${x.pos <= 10.5 ? 'p1' : ''}">#${Math.round(x.pos)}</b><span>${esc(x.q)}<small>${n0(x.i)} times seen, ${n0(x.c)} visits</small></span>
-        <em class="${d == null || Math.abs(d) < 1 ? '' : d > 0 ? 'up' : 'down'}">${d == null ? 'New' : Math.abs(d) < 1 ? 'Steady' : `${d > 0 ? '▲' : '▼'} ${Math.round(Math.abs(d))} in 4 weeks`}</em>${rankSpark(x.q)}</div>`; }).join('')}`; }).join('')
-    + `<p class="note2">Where the website appears in Google's regular results, averaged over the last four weeks. The map listings are separate and show up in the Google profile numbers. The small line is the last 12 weeks; up is better.</p>`;
-}
-function visibilityView() {
-  const r = range(), pr = prior(), G = D.gbp?.daily || [], R = D.gbp?.reviews || { list: [] }, W = weeks12(), wk = f => W.map(x => f(x));
-  const gIn = (rr, i) => sum(G.filter(x => inR(x[0], rr)), x => x[i]);
-  const ch = (c, p) => (!p ? '' : `<em class="${c >= p ? 'good' : 'bad'}">${c >= p ? '▲' : '▼'} ${Math.round(Math.abs(c - p) / p * 100)}%</em>`);
-  const newRev = R.list.filter(x => inR(x[0], r)), low = newRev.filter(x => x[1] && x[1] <= 3).length;
-  const T = rankList(), p1 = T.filter(x => x.pos <= 10.5).length;
-  const mv = T.filter(x => x.prev != null).map(x => x.prev - x.pos), avg = mv.length ? sum(mv, x => x) / mv.length : 0;
-  const head = `${p1} of the ${T.length} top searches that find the practice are on Google's first page.`;
-  const tag = R.total ? `${R.total} Google reviews${R.avg ? `, ${R.avg.toFixed(1)} stars on average` : ''}${newRev.length ? `, ${newRev.length} new ${rangeWords()}` : ''}.` : '';
-  const rank = `<div class="c8 card"><div class="top2"><div><h3>Where you rank on Google</h3><p class="cap">The searches people used most to find the site. #1 is the top result.${mv.length && Math.abs(avg) >= 0.5 ? ` On average they moved ${avg > 0 ? 'up' : 'down'} ${Math.abs(avg).toFixed(1)} places in four weeks.` : ''}</p></div><button class="more" style="margin:0" data-side="searches">All searches</button></div>${rankChart()}</div>`;
-  const prof = `<div class="c4 card"><h3>Google profile</h3>
-    <div class="stat2"><div class="v"><b>${n0(R.total)}</b>${newRev.length ? `<em class="${low ? 'bad' : 'good'}">+${newRev.length}${low ? `, ${low} low` : ''}</em>` : '<em>No new reviews</em>'}</div><span>Google reviews${R.avg ? `, ${R.avg.toFixed(1)} stars` : ''}</span>${kspark(wk(x => R.list.filter(y => inR(y[0], x)).length), '#4da8d3')}</div>
-    <div class="stat2"><div class="v"><b>${n0(gIn(r, 2))}</b>${ch(gIn(r, 2), gIn(pr, 2))}</div><span>Calls from your profile</span>${kspark(wk(x => gIn(x, 2)), '#4da8d3')}</div>
-    <div class="stat2"><div class="v"><b>${n0(gIn(r, 3))}</b>${ch(gIn(r, 3), gIn(pr, 3))}</div><span>Direction requests</span>${kspark(wk(x => gIn(x, 3)), '#4da8d3')}</div>
-    <div class="stat2"><div class="v"><b>${n0(gIn(r, 4))}</b>${ch(gIn(r, 4), gIn(pr, 4))}</div><span>Website visits from your profile</span></div></div>`;
-  let social = '';
-  const ig = D.ig;
-  if (ig) {
-    const Dd = ig.daily.filter(x => inR(x[0], r)), Dp = ig.daily.filter(x => inR(x[0], pr)), cover = ig.from && ig.from <= pr[0];
-    const views = sum(Dd, x => x[3]), inter = sum(Dd, x => x[4]), newF = sum(ig.daily.filter(x => x[2] != null), x => x[2]);
-    const posts = ig.posts.filter(x => inR(x.d, r)), med = median(ig.posts.map(x => x.reach)) || 1, top = [...posts].sort((a, b) => b.reach - a.reach).slice(0, 3);
-    social = `<div class="c8 card"><div class="top2"><div><h3>Instagram <span class="cap" style="font-size:13px">@${esc(ig.handle)}</span></h3><p class="cap">Organic posts ${rangeWords()}.</p></div><button class="more" style="margin:0" data-side="instagram">All posts</button></div>
-      <div class="ig4"><div><b>${n0(ig.followers)}</b><span>Followers${newF ? `, +${newF} in 30 days` : ''}</span></div><div><b>${n0(views)}</b><span>Views</span>${cover ? ch(views, sum(Dp, x => x[3])) : ''}</div>
-      <div><b>${n0(inter)}</b><span>Likes, comments, shares</span>${cover ? ch(inter, sum(Dp, x => x[4])) : ''}</div><div><b>${posts.length}</b><span>Posts</span></div></div>
-      ${top.length ? `<p class="cap" style="margin:10px 0 2px">Top posts</p>${top.map(x => `<a class="post" href="${esc(x.url)}" target="_blank" rel="noopener"><span class="pt">${esc(x.cap || 'Post')}</span><span class="pd">${dl(x.d)}</span><b>${n0(x.reach)}</b><small>${x.reach >= med * 2 ? `reached, ${(x.reach / med).toFixed(0)}× usual` : 'reached'}</small></a>`).join('')}` : `<p class="cap" style="margin-top:10px">No posts ${rangeWords()}.</p>`}</div>`;
-  }
-  const almost = (D.gsc?.almost || []).filter(x => !T.some(t => t.q === x.q)).slice(0, 6);
-  const near = `<div class="c4 card"><h3>More searches almost on page one</h3><p class="cap">Ranking 11 to 20 and not listed on the left. These are the cheapest wins next.</p>
-    ${almost.length ? almost.map(x => `<div class="line"><span>${esc(x.q)}</span><b>#${Math.round(x.pos)}</b></div>`).join('') : '<p class="cap" style="margin-top:10px">None right now.</p>'}</div>`;
-  return [head, tag, `<div class="grid">${rank}${prof}${almost.length ? social + near : social.replace('c8 card', 'c12 card')}</div>`];
-}
-
 // ----- Follow-ups
-function followupsView() {
-  const fu = followups(), p = P(), q = p?.quality;
-  const head = fu.length ? `${pl(fu.length, 'list')} waiting on the team.` : 'Nothing is waiting on the team.';
-  const tag = 'Names stay in GHL and OpenDental. Each item says where to open the list.';
-  const list = `<div class="panel">${fu.map(x => `<div class="act"><b class="${x.sev}">${typeof x.n === 'number' ? n0(x.n) : x.n}</b><div><h4>${esc(x.title)}</h4><p>${esc(x.why)}</p></div><div class="do">${x.act}</div></div>`).join('') || '<p style="padding:18px 22px">Nothing waiting.</p>'}</div>`;
-  const stages = p ? p.leads.openStages.slice(0, 8) : [], smx = Math.max(1, ...stages.map(x => x[1]));
-  const pipe = `<div class="c6 card"><h3>GHL pipeline right now</h3><p class="cap">Open opportunities by stage.</p>
-    <div style="margin-top:8px">${stages.map(([n, c]) => `<div class="b3"><span>${esc(n)}</span><span class="t"><i style="width:${c / smx * 100}%"></i></span><b>${c}</b></div>`).join('')}</div>${ghlBtn('opps', 'Open pipeline in GHL')}</div>`;
-  const health = `<div class="c6 card"><h3>Data health</h3><p class="cap">How well leads and patients line up across GHL and OpenDental, last 13 months.</p>
-    ${q ? `<div class="line"><span>New patients matched to their GHL lead</span><b>${n0(q.patnum + q.phone + q.email)}</b></div>
-      <div class="line"><span>Matched by OpenDental patient ID</span><b>${n0(q.patnum)}</b></div>
-      <div class="line"><span>New patients not in GHL</span><b>${n0(q.none)}</b></div>
-      <div class="line"><span>Leads in GHL</span><b>${n0(q.leads)}</b></div>
-      <div class="line"><span>Synced existing-patient contacts left out of lead counts</span><b>${n0(q.syncContactsExcluded)}</b></div>` : ''}
-    <p class="note2">Leads with no source in GHL can't be credited to the channel that brought them. A required "How did you hear about us?" field fixes most of it.</p></div>`;
-  return [head, tag, `${list}<div class="grid" style="margin-top:16px">${pipe}${health}</div>`];
-}
-
 // ---------- sidebars (totals only; no patient names anywhere)
 const tbl = (head, rows, attrs) => `<table><thead><tr>${head.map(h => (Array.isArray(h) ? `<th class="n">${h[0]}</th>` : `<th>${h}</th>`)).join('')}</tr></thead><tbody>${rows.map((r, i) => `<tr ${attrs ? attrs[i] || '' : ''}>${r.map((c, j) => `<td class="${Array.isArray(head[j]) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 const kv = items => `<div class="kv">${items.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
@@ -817,7 +768,9 @@ function sideKpi(k) {
   if (k === 'active') {
     const b = bridge();
     title('Active patients', 'A completed visit in the last 18 months');
-    if (!b) { el('sbody').innerHTML = `<p class="read">${n0(snap().activePatients)} patients have had a completed visit in the last 18 months.</p>${soon('Month-by-month gains and losses')}`; return; }
+    if (!b) { const sm = (p.seenMonthly || []).slice().reverse(), nwm = m => sum(p.daily.filter(x => x[0].startsWith(m)), x => x[7]);
+      el('sbody').innerHTML = `<p class="read">${n0(snap().activePatients)} patients have had a completed visit in the last 18 months.${p.firstRecord ? ` OpenDental's history starts in ${ml(p.firstRecord.slice(0, 7))}, so gained-and-lost counts begin in ${ml(fullFrom())}.` : ''}</p>
+        ${sm.length ? tbl(['Month', ['Patients seen', 1], ['New', 1]], sm.map(([m, n]) => [ml(m), n0(n), n0(nwm(m))])) : soon('Patients seen by month')}`; return; }
     el('sbody').innerHTML = `<p class="read">${n0(b.end)} active patients now, ${b.end >= b.start ? 'up' : 'down'} ${n0(Math.abs(b.end - b.start))} from ${ml(b.startM)}. The practice gained ${n0(b.nw)} new patients${b.back ? ` and ${n0(b.back)} came back after a gap` : ''}, while ${n0(b.lapsed)} passed 18 months without a visit.</p>
       ${tbl(['Month', ['New', 1], ['Came back', 1], ['Lapsed', 1], ['Active', 1]], b.rows.slice().reverse().map(x => [ml(x.m), x.nw, x.back || '—', x.lapsed || '—', n0(x.active)]))}
       <p class="s">"Lapsed" is net: patients reaching 18 months without a visit, minus those who returned. Keeping hygiene patients on recall is what keeps this number small.</p>`;
@@ -899,6 +852,7 @@ function sideInstagram() {
 function sideAbout() {
   title('About these numbers', `Refreshed ${new Date(D.generatedAt).toLocaleString()}`);
   el('sbody').innerHTML = `<p class="read">Patients, visits, production, collections, treatment plans and insurance come from OpenDental. Leads come from GHL. Reviews, calls and rankings come from Google, and posts from Instagram.</p>
+    ${PR()?.firstRecord ? `<p class="s">OpenDental's treatment history starts in ${ml(PR().firstRecord.slice(0, 7))}. Counts that look back 18 months (active and lapsed patients) are only complete from ${ml(fullFrom())}.</p>` : ''}
     <p class="s">Patient details never leave the practice's server. The droplet sends only totals by day, week or month, so this page holds no names, phone numbers or visit records.</p>
     <p class="s">A new patient is a first completed visit that OpenDental flags as new. Active patients had a completed visit in the prior 18 months. Collected is insurance plus patient payments. Monthly totals are prorated when a date range covers part of a month.</p>
     <p class="s">Targets shown (98% collections, 85% rebooked, about 30% gum care, 25–33% hygiene share, 90% kept appointments) are common industry rules of thumb.</p>
@@ -907,7 +861,7 @@ function sideAbout() {
 function sideView(v) {
   const [k, arg] = String(v.side || '').split(/:(.*)/s);
   if (k === 'k') return sideKpi(arg); if (k === 'src') return sideSource(arg); if (k === 'prov') return sideProv(arg); if (k === 'svc') return sideSvc(arg);
-  if (k === 'mkt') return sideMkt(arg); if (k === 'car') return sideCar(decodeURIComponent(arg)); if (k === 'owed') return sideOwed(); if (k === 'searches') return sideSearches(); if (k === 'instagram') return sideInstagram();
+  if (k === 'mkt') return sideMkt(arg); if (k === 'sources') return sideSources(); if (k === 'credit') return sideCredit(); if (k === 'services') return sideServices(); if (k === 'carriers') return sideCarriers(); if (k === 'health') return sideHealth(); if (k === 'car') return sideCar(decodeURIComponent(arg)); if (k === 'owed') return sideOwed(); if (k === 'searches') return sideSearches(); if (k === 'instagram') return sideInstagram();
   return sideAbout();
 }
 function openSide(v, push) {
@@ -940,7 +894,8 @@ async function boot() {
 const fail = m => (el('gate').innerHTML = `<div id="lock"><p class="err">${esc(m)}</p></div>`);
 function start(data) {
   D = data;
-  el('win').innerHTML = [[30, '30 days'], [90, '90 days'], [365, '12 months']].map(([k, t]) => `<button data-win="${k}">${t}</button>`).join('');
+  if (+D.today.slice(8, 10) <= 3) S.win = 'last';
+  el('win').innerHTML = [['mtd', 'This month'], ['last', 'Last month'], [90, '90 days'], [365, '12 months']].map(([k, t]) => `<button data-win="${k}">${t}</button>`).join('');
   el('upd').textContent = `Updated ${dl(D.today)}`;
   el('gate').hidden = true; el('shell').hidden = false;
   readTab(); render();
@@ -950,14 +905,16 @@ el('sx').onclick = closeSide; el('scrim').onclick = closeSide;
 el('sback').onclick = () => { S.stack.pop(); const v = S.stack[S.stack.length - 1]; if (v) { el('sback').hidden = S.stack.length < 2; sideView(v); } };
 addEventListener('keydown', e => { if (e.key === 'Escape') closeSide(); });
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-win],[data-tab],[data-side],[data-about]'); if (!t) return;
+  const t = e.target.closest('[data-win],[data-tab],[data-side],[data-about],[data-rankall]'); if (!t) return;
   const d = t.dataset, inside = !!t.closest('#side');
-  if (d.win) { S.win = +d.win; render(); if (S.stack.length) sideView(S.stack[S.stack.length - 1]); }
+  if (d.rankall) { S.rankAll = !S.rankAll; render(); }
+  else if (d.win) { S.win = /^\d+$/.test(d.win) ? +d.win : d.win; render(); if (S.stack.length) sideView(S.stack[S.stack.length - 1]); }
   else if (d.tab) { closeSide(); if (location.hash === '#' + d.tab) render(); else location.hash = d.tab; }
   else if (d.side) openSide({ side: d.side }, inside);
   else if (d.about) openSide({ side: 'about' }, false);
 });
 boot();
+
 </script>
 </body>
 </html>
