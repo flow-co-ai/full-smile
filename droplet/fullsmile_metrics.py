@@ -547,7 +547,7 @@ def build():
     booked_ids, showed_ids = set(), set()
     for r in od['newAppts']:
         rec, _ = match(r)
-        if not rec: continue
+        if not rec or not rec.get('day') or d10(r.get('d')) < rec['day']: continue
         booked_ids.add(rec['id'])
         if str(r.get('st')) == '2': showed_ids.add(rec['id'])
 
@@ -593,14 +593,14 @@ def build():
     # --- leads by week and channel (cohort by the week the lead came in)
     # Columns: leads, booked, showed, lost, then OpenDental-confirmed: new patients from these leads, and what they have paid.
     lw = {}
+    # Booked and showed come from OpenDental only (a matched new-patient appointment); GHL stages are not used for either.
     for l in leads:
-        stage = 'showed' if l['id'] in showed_ids else 'scheduled' if l['id'] in booked_ids else l['stage']
         key = (monday(l['day']), l['ch'])
         x = lw.setdefault(key, [0, 0, 0, 0, 0, 0.0])
         x[0] += 1
-        if stage in ('scheduled', 'showed', 'noshow'): x[1] += 1
-        if stage == 'showed': x[2] += 1
-        if stage == 'lost': x[3] += 1
+        if l['id'] in booked_ids or l['id'] in showed_ids: x[1] += 1
+        if l['id'] in showed_ids: x[2] += 1
+        if l['stage'] == 'lost': x[3] += 1
         if l['id'] in lead_np: x[4] += lead_np[l['id']][0]; x[5] = round(x[5] + lead_np[l['id']][1], 2)
     lead_weeks = [[w, ch, *v] for (w, ch), v in sorted(lw.items())]
     ld = {}
