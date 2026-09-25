@@ -16,6 +16,7 @@ Usage
   python3 fullsmile_metrics.py            build and push
   python3 fullsmile_metrics.py --dry-run  build, write ./practice.json, do not push
   python3 fullsmile_metrics.py --check    test OpenDental, GHL and GitHub access, then stop
+  python3 fullsmile_metrics.py --audit --channel=lsa   list each new patient credited to a channel (screen only)
 
 Settings come from environment variables, or from a file named fullsmile_metrics.env
 next to this script (KEY=value per line). See .env.example.
@@ -551,16 +552,25 @@ def build():
     prod = {str(r.get('pat')): num(r.get('amt')) for r in od['npProd']}
     plan = {str(r.get('pat')): num(r.get('amt')) for r in od['npPlan']}
     visits = {str(r.get('pat')): int(num(r.get('n'))) for r in od.get('npVisits') or []}
-    np_weeks, quality = {}, {'patnum': 0, 'phone': 0, 'email': 0, 'odReferral': 0, 'none': 0}
+    np_weeks, quality = {}, {'patnum': 0, 'phone': 0, 'email': 0, 'odReferral': 0, 'none': 0, 'leadAfterVisit': 0}
+    lead_np, AUDIT = {}, []
     for r in od['newPatients']:
         fv = d10(r.get('fv'))
         if not fv: continue
         rec, how = match(r)
         pat = str(r.get('pat'))
-        if rec and rec['lead']:
+        # Credit a channel only when the GHL lead existed before the first visit (and within a year of it).
+        # A contact created after the visit is a patient who later landed in GHL, not a patient the channel brought.
+        fv_d = dt.date.fromisoformat(fv)
+        lead_ok = bool(rec and rec['lead'] and rec['day'] and rec['day'] <= fv and rec['day'] >= (fv_d - dt.timedelta(days=365)).isoformat())
+        if rec and rec['lead'] and not lead_ok:
+            quality['leadAfterVisit'] += 1
+        if lead_ok:
             ch, by = rec['ch'], 'ghl'
             quality[how] += 1
             showed_ids.add(rec['id'])
+            t = lead_np.setdefault(rec['id'], [0, 0.0]); t[0] += 1; t[1] += coll.get(pat, 0)
+            AUDIT.append((ch, pat, fv, rec['day'], how, round(coll.get(pat, 0), 2)))
         elif ref_by_pat.get(pat):
             ch, by = ref_channel(ref_by_pat[pat]) or 'referral', 'opendental'
             quality['odReferral'] += 1
@@ -574,15 +584,17 @@ def build():
     new_patients = [[w, ch, by, v[0], round(v[1], 2), round(v[2], 2), round(v[3], 2), v[4]] for (w, ch, by), v in sorted(np_weeks.items())]
 
     # --- leads by week and channel (cohort by the week the lead came in)
+    # Columns: leads, booked, showed, lost, then OpenDental-confirmed: new patients from these leads, and what they have paid.
     lw = {}
     for l in leads:
         stage = 'showed' if l['id'] in showed_ids else 'scheduled' if l['id'] in booked_ids else l['stage']
         key = (monday(l['day']), l['ch'])
-        x = lw.setdefault(key, [0, 0, 0, 0])
+        x = lw.setdefault(key, [0, 0, 0, 0, 0, 0.0])
         x[0] += 1
         if stage in ('scheduled', 'showed', 'noshow'): x[1] += 1
         if stage == 'showed': x[2] += 1
         if stage == 'lost': x[3] += 1
+        if l['id'] in lead_np: x[4] += lead_np[l['id']][0]; x[5] = round(x[5] + lead_np[l['id']][1], 2)
     lead_weeks = [[w, ch, *v] for (w, ch), v in sorted(lw.items())]
     ld = {}
     for l in leads:
@@ -607,6 +619,7 @@ def build():
         'noShowNotRebooked': sum(1 for l in leads if l['stage'] == 'noshow' and l['id'] not in showed_ids and l['day'] >= (today - dt.timedelta(days=60)).isoformat()),
     }
 
+    globals()['AUDIT_ROWS'] = AUDIT
     if not field_ids_pat:
         NOTES.append('No GHL custom field holding the OpenDental patient ID was found, so matching used phone and email only. Set GHL_PATNUM_FIELD.')
     return {
@@ -692,6 +705,15 @@ if __name__ == '__main__':
           f"{q['leads']} leads, {round(time.time() - started)}s")
     for n in NOTES:
         print('note:', n)
+    if '--audit' in sys.argv:
+        # Printed on this screen only; never written to a file or pushed. PatNums let staff spot-check in OpenDental.
+        rows = sorted(globals().get('AUDIT_ROWS', []), key=lambda x: (x[0], x[2]))
+        want = [a.split('=', 1)[1] for a in sys.argv if a.startswith('--channel=')]
+        print('channel | PatNum | first visit | lead created | matched by | collected so far')
+        for ch, pat, fv, ld, how, c in rows:
+            if not want or ch in want:
+                print(f'{ch} | {pat} | {fv} | {ld} | {how} | {c}')
+        sys.exit(0)
     if '--dry-run' in sys.argv:
         open(os.path.join(HERE, 'practice.json'), 'w').write(json.dumps(doc, indent=1))
         print('Wrote practice.json (not pushed).')

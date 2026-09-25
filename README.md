@@ -1,67 +1,58 @@
-# Droplet script (for Ahmed / Ali)
+# Full Smile Dental: practice report
 
-`fullsmile_metrics.py` runs on the Full Smile droplet (134.122.28.124), next to the existing OpenDental ↔ GHL sync.
-It reads OpenDental (Open Dental API, read-only SQL via `PUT /queries/ShortQuery`) and GHL, matches new patients
-to their GHL lead on the droplet, and commits **only totals** to `data/practice.json` in the dashboard repo.
-No names, phones, emails, PatNums or per-patient dates are written anywhere. Standard library only.
+Private dashboard at **fullsmile-practice-report.netlify.app** (Netlify site `97a208f2-8ffd-444b-b21d-12a711a3bc82`).
+Seven views: Overview, New patients, Production, Treatment, Hygiene & schedule, Online presence, Follow-ups.
+Every number opens a sidebar with its month-by-month detail. Password-protected (AES-256-GCM, decrypted in the browser).
 
-## Install (about 10 minutes)
+GHL buttons open the Full Smile sub-account (the droplet sends the location ID; set `ghl_app_base` in config.json if GHL
+runs on a white-label domain). OpenDental is desktop software, so each list names its menu path instead of linking.
+Ads are off (`ads_active: false`), so spend no longer drives the headlines; historic spend stays in the data.
 
-```bash
-sudo mkdir -p /opt/fullsmile-metrics && cd /opt/fullsmile-metrics
-# copy fullsmile_metrics.py and .env.example here, then:
-cp .env.example fullsmile_metrics.env && chmod 600 fullsmile_metrics.env
-nano fullsmile_metrics.env           # fill in the values
-python3 fullsmile_metrics.py --check    # OpenDental, GHL and GitHub must all say OK
-python3 fullsmile_metrics.py --dry-run  # builds ./practice.json without pushing; open it and check the numbers
-python3 fullsmile_metrics.py            # first real push
+## How it fits together
+
+```
+OpenDental ─┐                         (droplet, HIPAA side)
+GHL ────────┴─ droplet/fullsmile_metrics.py ── totals only ──► data/practice.json (this repo)
+                                                                        │
+Windsor (Meta, Google Ads, Google profile, Search Console, Instagram) ──┤
+data/lsa-spend.json (entered monthly) ──────────────────────────────────┤
+                                                                        ▼
+                                             GitHub Action: scripts/build.mjs → encrypted → Netlify
 ```
 
-Schedule it every 2 hours, 7 AM to 7 PM Central (the droplet clock is UTC):
+**Patient data never leaves the droplet.** The droplet matches new patients to their GHL lead itself and sends only
+counts and dollar totals (by day for practice totals, by week for anything tied to patients). GitHub and Netlify
+never see a name, phone, email, patient ID or visit record.
+
+## Secrets (GitHub → Settings → Secrets and variables → Actions)
+
+| Secret | Value |
+|---|---|
+| `WINDSOR_API_KEY` | Same Windsor key as the other dashboards |
+| `DASHBOARD_KEY` | The password Dr. Jamal and Dr. Adham will type |
+| `NETLIFY_AUTH_TOKEN` | Same Netlify token as the Maadi dashboard |
+| `NETLIFY_SITE_ID` | `97a208f2-8ffd-444b-b21d-12a711a3bc82` |
+
+## Monthly: LSA spend
+
+Google LSA is billed outside the Google Ads account Windsor reads. At the start of each month, open the LSA dashboard,
+copy last month's total into `data/lsa-spend.json` (`"2026-09": 1234`), and commit. The Attention tab reminds you
+when a month is missing. Optional: set `lsa_monthly_cap` in `config.json` to get a warning at 80%.
+
+## Settings (config.json)
+
+- `tracked_keywords`: the local searches on the Reputation tab.
+- `ghl_opportunities_url`: paste the GHL Opportunities page URL so "Open GHL" buttons go straight there.
+- `windsor`: account ids (verified: Meta 1222692849377651, lead forms 986536337875135, Google Ads 256-681-8994,
+  Google profile locations/9295260348937485711, Search Console https://fullsmilechicago.com/, Instagram 17841477163064218).
+
+## Local preview (sample numbers, no real patients)
 
 ```bash
-crontab -e
-# add:
-0 12-23/2,0 * * * cd /opt/fullsmile-metrics && /usr/bin/python3 fullsmile_metrics.py >> /var/log/fullsmile-metrics.log 2>&1
+node scripts/make-fixture.mjs
+cp droplet/practice.json sample/practice.json   # from: python3 droplet/fullsmile_metrics.py --dry-run
+FIXTURE=sample/fixture.json NO_ENCRYPT=1 node scripts/build.mjs
+python3 -m http.server -d public 8080
 ```
 
-It only commits when the numbers change, and each commit rebuilds the dashboard.
-
-## What it needs
-
-- **Open Dental API**: the same developer key and customer key the sync uses. The key's permissions in Open Dental must allow **Queries** (ShortQuery). If `--check` fails on OpenDental with 401 or 403, enable it under Setup → Advanced Setup → API.
-- **GHL token** for the Full Smile sub-account: contacts.readonly, opportunities.readonly, locations/customFields.readonly.
-- **GitHub fine-grained token**: resource owner `flow-co-ai`, repository access = only `full-smile`, permission Contents = Read and write.
-
-## What it reads
-
-| Number | From |
-|---|---|
-| Production | procedurelog, ProcStatus = 2, ProcFee × (UnitQty + BaseUnits), by ProcDate |
-| Collected | paysplit.SplitAmt by DatePay, plus claimproc.InsPayAmt (Status Received/Supplemental) by DateCP. Write-offs excluded. |
-| Visits, broken, show rate | appointment by AptDateTime, AptStatus 2 = complete, 5 = broken |
-| New patients | first completed appointment flagged IsNewPatient, counted by week. (Not DateFirstVisit: the GHL sync stamps it on records it creates.) |
-| Source of a new patient | GHL contact matched by PatNum field, then phone, then email; else the OpenDental "Referred from" entry |
-| Services | CDT code ranges (D6000s implants, D2700s crowns, D9947–D9949 sleep apnea, D7000s surgery, etc.) |
-| Snapshots | recall overdue, planned treatment with no appointment, broken appointments not rebooked, active patients |
-
-Leads: GHL contacts, excluding contacts created by the OpenDental sync (source "OpenDental", "OD Patient", or tagged
-`open-dental-synced` with no marketing source) and anything tagged spam/test/duplicate.
-
-## Version 2 additions (all totals)
-
-| Number | From |
-|---|---|
-| Procedures by code, by month | procedurelog + procedurecode |
-| Production days and patients per provider, by month | procedurelog |
-| Treatment follow-through | procedurelog by DateTP month: done, scheduled, not scheduled (same-day work excluded) |
-| Unscheduled treatment by age and service | procedurelog ProcStatus 1, AptNum 0 |
-| Patient balances | patient aging fields on guarantors |
-| Unpaid insurance | claim, by status and days since sent |
-| Insurance plans | claimproc received, by carrier and month: billed, paid, written off |
-| Hygiene rebooking | completed visits with D1110/D1120/D4910/D4346/D434x/D4355 that have a later visit booked or done |
-| Chair time | schedule (provider hours) and appointment Pattern (5-minute steps), by week and provider |
-| Active patients by month end | distinct patients with a completed procedure in the prior 18 months |
-| Daily snapshot history | kept in practice.json under `history`, one entry per day |
-
-Every new query runs through `od_try`, so an older Open Dental version that lacks a column adds a note instead of stopping the run.
+Droplet setup is in `droplet/README.md`.

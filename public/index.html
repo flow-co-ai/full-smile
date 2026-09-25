@@ -159,6 +159,11 @@ tr.go{cursor:pointer}tr.go:hover td{background:#f7faff}
 @media (prefers-reduced-motion:reduce){#scrim,#side{transition:none}}
 
 /* ---- v2 additions ---- */
+.rk{display:grid;grid-template-columns:52px minmax(0,1fr) 130px 90px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line2)}
+.rk>b{font-size:20px;font-weight:800;color:var(--text2);text-align:right}.rk>b.p1{color:var(--accent)}
+.rk span{font-size:14.5px;font-weight:600;color:var(--ink);min-width:0}.rk small{display:block;font-size:12px;color:var(--text3);font-weight:500}
+.rk em{font-style:normal;font-size:12.5px;font-weight:700;color:var(--text3);text-align:right}.rk em.up{color:var(--good)}.rk em.down{color:var(--bad)}
+@media (max-width:860px){.rk{grid-template-columns:44px 1fr 90px}.rk svg{display:none}}
 .nav button{padding:9px 12px}
 .brief{align-self:end}
 .brief p{padding:0 0 0 12px;border-left:3px solid var(--line);color:var(--text2);margin:0 0 10px;font-size:14.5px;max-width:62ch}
@@ -433,13 +438,13 @@ function findings() {
 }
 
 // ---------- views
-const VIEWS = [['overview', 'Overview'], ['patients', 'New patients'], ['production', 'Production'], ['treatment', 'Treatment'], ['hygiene', 'Hygiene & schedule'], ['visibility', 'Online presence'], ['followups', 'Follow-ups']];
+const VIEWS = [['overview', 'Overview'], ['patients', 'New patients'], ['marketing', 'Marketing results'], ['production', 'Production'], ['treatment', 'Treatment'], ['hygiene', 'Hygiene & schedule'], ['visibility', 'Online presence'], ['followups', 'Follow-ups']];
 function readTab() { const t = location.hash.slice(1); S.tab = VIEWS.some(x => x[0] === t) ? t : 'overview'; }
 function render() {
   document.querySelectorAll('#win button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.win === String(S.win))));
   const fu = followups().filter(x => x.sev === 'hot' || x.sev === 'warn').length;
   el('nav').innerHTML = VIEWS.map(([k, t]) => `<button data-tab="${k}" aria-current="${S.tab === k ? 'page' : 'false'}"><span><b>${t}</b></span>${k === 'followups' && fu ? `<i class="badge">${fu}</i>` : ''}</button>`).join('');
-  const fn = { overview: overviewView, patients: patientsView, production: productionView, treatment: treatmentView, hygiene: hygieneView, visibility: visibilityView, followups: followupsView }[S.tab];
+  const fn = { overview: overviewView, patients: patientsView, marketing: marketingView, production: productionView, treatment: treatmentView, hygiene: hygieneView, visibility: visibilityView, followups: followupsView }[S.tab];
   if (!P() && !['visibility'].includes(S.tab)) { el('vhead').innerHTML = `<h1>Practice numbers are on the way.</h1><p class="tag">The droplet has not sent OpenDental data yet.</p>`; el('view').innerHTML = ''; return; }
   const [head, tag, body, hero] = fn();
   el('win').style.visibility = S.tab === 'followups' ? 'hidden' : 'visible';
@@ -516,14 +521,14 @@ function todayCard() {
 }
 function miniCards() {
   const s = snap(), r = range(), h = hygIn(r), tx = txIn(r), ca = chairAhead(), p = PR();
-  const T = D.gsc?.tracked || [], p1 = T.filter(x => x.pos != null && x.pos <= 10.5).length;
+  const T = rankList(), p1 = T.filter(x => x.pos <= 10.5).length;
   const planned = sum(tx, 'planned');
   const fut = p.daily.filter(x => x[0] > D.asOf && x[0] <= shift(D.today, 14)), booked14 = sum(fut, x => x[6]);
   const fill = ca?.hasSched ? sum(ca.list, 'booked') / Math.max(1, sum(ca.list, 'sched')) : null;
   return `<button class="card c3 mini" data-tab="treatment"><h3>Treatment waiting</h3><span class="big">${s.unschedAmount != null ? $k(s.unschedAmount) : '—'}</span><p>${s.unschedPatients ? `${pl(s.unschedPatients, 'patient')} with nothing scheduled.` : ''}${planned > 0 ? ` ${pct(sum(tx, 'moving') / planned)} of recent plans are moving.` : ''}</p><span class="go2">Treatment</span></button>
     <button class="card c3 mini" data-tab="hygiene"><h3>Hygiene</h3><span class="big">${h.rate != null ? pct(h.rate) : n0(s.recallOverdue)}</span><p>${h.rate != null ? `of hygiene patients rebooked. ${n0(s.recallOverdue)} overdue for a cleaning.` : 'patients overdue for a cleaning.'}</p><span class="go2">Hygiene & schedule</span></button>
     <button class="card c3 mini" data-tab="hygiene"><h3>Schedule ahead</h3><span class="big">${fill != null ? pct(fill) : n0(booked14)}</span><p>${fill != null ? `of chair time booked over the next 4 weeks.` : `visits booked in the next 14 days.`}</p>${minibars(Array.from({ length: 14 }, (_, i) => sum(p.daily.filter(x => x[0] === shift(D.today, i)), x => x[6])))}<span class="go2">See the schedule</span></button>
-    <button class="card c3 mini" data-tab="visibility"><h3>Found on Google</h3><span class="big">${p1} of ${T.length}</span><p>key local searches on page one.</p><span class="go2">Online presence</span></button>`;
+    <button class="card c3 mini" data-tab="visibility"><h3>Found on Google</h3><span class="big">${p1} of ${T.length}</span><p>top searches on page one.</p><span class="go2">Online presence</span></button>`;
 }
 
 // ----- New patients
@@ -577,6 +582,46 @@ function servicesCard(r) {
     <div style="margin-top:8px">${rows.length ? rows.map(([k, n]) => `<div class="b3"><span>${esc(cap1(k))}</span><span class="t"><i style="width:${n / mx * 100}%"></i></span><b>${n}</b></div>`).join('') : '<p class="cap" style="margin-top:10px">No service recorded on leads in this period.</p>'}</div></div>`;
 }
 
+
+// ----- Marketing results: leads followed through to OpenDental, by the week the lead came in
+function marketingIn(r) {
+  const out = {}, get = k => (out[k] ||= { k, ...(CH[k] || { label: k }), spend: 0, leads: 0, booked: 0, np: 0, coll: 0 });
+  for (const [d, ch, amt] of D.spend || []) if (inR(d, r)) get(ch).spend += amt;
+  for (const x of P()?.leads.weeks || []) if (wkIn(x[0], r)) { const t = get(x[1]); t.leads += x[2]; t.booked += x[3]; t.np += x[6] || 0; t.coll += x[7] || 0; }
+  return Object.values(out).filter(x => x.spend || x.leads).map(x => ({ ...x, cpnp: x.spend && x.np ? x.spend / x.np : null, roi: x.spend ? x.coll / x.spend : null }))
+    .sort((a, b) => (b.spend > 0) - (a.spend > 0) || b.coll - a.coll || b.leads - a.leads);
+}
+function marketingView() {
+  const r = range(), ok = V2() && (P().leads.weeks[0] || []).length >= 8;
+  if (!ok) return ['Marketing results', '', `<div class="card"><h3>Corrected results arrive with the droplet update</h3><p class="cap" style="margin-top:6px;max-width:70ch">The earlier version credited channels with patients who were already in OpenDental, so it overcounted new patients from LSA and Meta. The new count only credits a channel when its lead came in before the patient's first visit, and every patient is confirmed in OpenDental. Run the droplet update to see them.</p></div>`];
+  const rows = marketingIn(r), paid = rows.filter(x => x.spend > 0), spend = sum(paid, 'spend'), np = sum(paid, 'np'), coll = sum(paid, 'coll');
+  const head = spend ? `${$k(spend)} in ads brought ${pl(np, 'new patient')} who have paid ${$k(coll)} so far.` : `${pl(sum(rows, 'np'), 'new patient')} from tracked leads ${rangeWords()}.`;
+  const tag = spend && coll ? `That is ${(coll / spend).toFixed(1)}× the ad spend, and it keeps growing as treatment is completed.` : '';
+  const missing = (() => { const ent = D.lsa?.entered || [], lw = (P().leads.weeks || []).filter(x => x[1] === 'lsa' && x[2]);
+    const need = months12().filter(m => mw(m, r) > 0 && !ent.includes(m) && lw.some(x => x[0].slice(0, 7) === m)); return need.length ? `LSA spend is not entered for ${need.map(ml).join(', ')}, so LSA cost and return read off for this range until it is added to data/lsa-spend.json.` : ''; })();
+  const table = `<div class="panel"><div class="ch-h"><span>Channel</span><span class="r">Spent</span><span class="r">Leads</span><span class="r">Booked</span><span class="r">Became patients</span><span class="r">Paid so far</span><span class="r">Return on spend</span></div>
+    ${rows.map(x => `<button class="ch-r" data-side="mkt:${x.k}"><span class="nm">${esc(x.label)}${x.cpnp ? `<small>${$(x.cpnp)} per new patient</small>` : x.spend ? '' : '<small>No ad spend</small>'}</span>
+      <span class="r ${x.spend ? '' : 'muted'} hide">${x.spend ? $(x.spend) : 'Free'}</span><span class="r hide">${x.leads || '—'}</span><span class="r hide">${x.booked || '—'}</span>
+      <span class="r np">${x.np || '—'}</span><span class="r hide">${x.coll ? $(x.coll) : '—'}</span><span class="cost">${x.roi ? `${x.roi.toFixed(1)}×` : x.spend ? '—' : ''}</span></button>`).join('')}
+    <div class="foot">Each lead is followed from the week it came into GHL. "Became patients" counts only people OpenDental confirms had a first visit after the lead came in. "Paid so far" is patient and insurance payments from them. Spend is ad cost only, not the retainer.${missing ? ` ${missing}` : ''}</div></div>`;
+  const q = P().quality;
+  const how = `<div class="grid" style="margin-top:16px"><div class="card c6"><h3>How a patient gets credited</h3>
+      <div class="line"><span>Matched to the lead by OpenDental patient ID</span><b>${n0(q.patnum)}</b></div><div class="line"><span>Matched by phone number</span><b>${n0(q.phone)}</b></div>
+      <div class="line"><span>Matched by email</span><b>${n0(q.email)}</b></div><div class="line"><span>Became a GHL contact after their first visit, so not credited</span><b>${n0(q.leadAfterVisit)}</b></div>
+      <p class="note2">Last 13 months. Anyone can spot-check the credited patients on the practice's server; names never leave it.</p></div>
+    <div class="card c6"><h3>Where leads came from</h3><p class="cap">Leads in GHL ${rangeWords()}, by source.</p>${(() => { const L = rows.filter(x => x.leads), mx = Math.max(1, ...L.map(x => x.leads)); return L.map(x => `<div class="b3"><span>${esc(x.label)}</span><span class="t"><i style="width:${x.leads / mx * 100}%;background:${x.color || '#4da8d3'}"></i></span><b>${x.leads}</b></div>`).join(''); })()}
+      <p class="note2">"No source in GHL" leads can't be credited to anyone. A required "How did you hear about us?" field closes most of that gap.</p></div></div>`;
+  return [head, tag, table + how];
+}
+function sideMkt(k) {
+  const r = range(), x = marketingIn(r).find(y => y.k === k) || { spend: 0, leads: 0, booked: 0, np: 0, coll: 0 }, M = months12().slice().reverse();
+  title(chLabel(k), RW());
+  el('sbody').innerHTML = `<p class="read">${x.leads ? `${pl(x.leads, 'lead')} came in. ${x.booked} booked, ${pl(x.np, 'person', 'people')} became patients, and they have paid ${$(x.coll)} so far.` : 'No leads from here in this period.'}${x.spend ? ` ${$(x.spend)} was spent${x.np ? `, ${$(x.spend / x.np)} per new patient` : ''}.` : ''}</p>
+    ${kv([[x.spend ? $(x.spend) : 'Free', 'Spent'], [n0(x.leads), 'Leads'], [n0(x.np), 'Became patients'], [$(x.coll), 'Paid so far']])}
+    <h4>By month the lead came in</h4>${tbl(['Month', ['Spent', 1], ['Leads', 1], ['Patients', 1], ['Paid so far', 1]], M.map(m => { const y = marketingIn(mRange(m)).find(z => z.k === k) || {}; return [ml(m), y.spend ? $(y.spend) : '—', y.leads || '—', y.np || '—', y.coll ? $(y.coll) : '—']; }))}
+    ${k === 'lsa' ? '<p class="s">LSA spend is entered by hand from the LSA dashboard each month, because Google bills it outside the Ads account.</p>' : ''}`;
+}
+
 // ----- Production
 function productionView() {
   const r = range(), T = practiceIn(r), Q = hasPrior() ? practiceIn(prior()) : null, M = months12(), p = PR(), s = snap();
@@ -614,7 +659,7 @@ function productionView() {
   // top procedures
   const cd = codesIn(r).slice(0, 10);
   const top = cd.length ? `<div class="card c12"><h3>Top procedures</h3><p class="cap">By production ${rangeWords()}.</p>${tbl(['Code', 'Procedure', ['Count', 1], ['Production', 1]], cd.map(x => [esc(x.code), esc(x.d), n0(x.n), $(x.amt)]))}${odp('prod')}</div>` : '';
-  return [head, tag, `<div class="grid">${trend}${owed}${prov}${svc}${ins}${top}</div>`];
+  return [head, tag, `<div class="grid">${trend}${owed}${prov}${svc}${ins}</div>`];
 }
 
 // ----- Treatment
@@ -689,46 +734,37 @@ function hygieneView() {
 
 // ----- Online presence (was Reputation)
 const RKC = ['#152449', '#4da8d3', '#06aad7', '#3e5a8c', '#9aa9c0'];
+function rankList() {
+  const G = D.gsc || {}, seen = new Set(), items = [];
+  for (const x of [...(G.tracked || []), ...(G.top || [])]) { if (x.pos == null || x.brand || seen.has(x.q) || (x.i || 0) < 10) continue; seen.add(x.q); items.push(x); }
+  return items.sort((a, b) => b.i - a.i).slice(0, 14).sort((a, b) => a.pos - b.pos);
+}
+function rankSpark(q) {
+  const p = (D.gsc?.series?.[q]?.p || []).slice(-12); if (p.filter(v => v != null).length < 2) return '<span></span>';
+  const lo = 1, hi = Math.max(20, ...p.filter(v => v != null)), w = 90, h = 24, step = w / (p.length - 1), y = v => 3 + (Math.min(v, hi) - lo) / (hi - lo) * (h - 6);
+  const pts = p.map((v, i) => (v == null ? null : `${(i * step).toFixed(1)},${y(v).toFixed(1)}`)).filter(Boolean);
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:90px;height:24px" aria-hidden="true"><polyline points="${pts.join(' ')}" fill="none" stroke="#4da8d3" stroke-width="1.8"/></svg>`;
+}
 function rankChart() {
-  const T = (D.gsc?.tracked || []).filter(x => D.gsc.series?.[x.q]), weeks = D.gsc?.weeks || [];
-  if (!T.length || weeks.length < 2) return '<p class="cap" style="margin-top:10px">Not enough ranking history yet.</p>';
-  const CAP = 30, inTop = k => D.gsc.series[k.q].p.some(v => v != null && v <= CAP);
-  const top = [...T].filter(inTop).sort((a, b) => b.i - a.i).slice(0, 5), rest = T.filter(k => !inTop(k) && k.pos != null);
-  if (!top.length) return `<p class="cap" style="margin-top:10px">None of the tracked searches has reached Google's top ${CAP} yet.</p>`;
-  const Wd = 640, H = 170, padL = 40, padR = 12, floor = H - 12;
-  const yOf = (v, i = 0) => (v > CAP ? floor - 5 + i * 2.5 : 8 + (Math.max(v, 1) - 1) / (CAP - 1) * (floor - 30));
-  const xOf = i => padL + i / (weeks.length - 1) * (Wd - padL - padR);
-  let s = `<svg class="chart" viewBox="0 0 ${Wd} ${H + 22}" role="img" aria-label="Google position by week">
-    <rect x="${padL}" y="${yOf(1) - 4}" width="${Wd - padL - padR}" height="${yOf(10.5) - yOf(1) + 4}" rx="6" fill="#eaf5fb"/>
-    <text x="${Wd - padR - 8}" y="${yOf(1) + 12}" text-anchor="end" font-size="11" font-family="Urbanist" font-weight="700" fill="#4da8d3">Page one</text>
-    <rect x="${padL}" y="${floor - 9}" width="${Wd - padL - padR}" height="18" rx="6" fill="#f4f6fa"/>
-    <text x="${padL - 6}" y="${floor + 4}" text-anchor="end" font-size="10.5" fill="#8491a7" font-family="Urbanist">#${CAP}+</text>`;
-  for (const v of [1, 10, 20]) s += `<line x1="${padL}" x2="${Wd - padR}" y1="${yOf(v)}" y2="${yOf(v)}" stroke="#e8f0fa"/><text x="${padL - 6}" y="${yOf(v) + 4}" text-anchor="end" font-size="10.5" fill="#8491a7" font-family="Urbanist">#${v}</text>`;
-  top.forEach((k, i) => {
-    const pts = D.gsc.series[k.q].p.map((v, j) => (v == null ? null : [xOf(j), yOf(v, i), v]));
-    let seg = [], last = null;
-    const flush = () => { if (seg.length > 1) s += `<polyline points="${seg.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')}" fill="none" stroke="${RKC[i]}" stroke-width="2.2" stroke-linejoin="round"/>`; seg = []; };
-    pts.forEach(p => { if (!p) { flush(); return; } if (last && !seg.length) s += `<line x1="${last[0]}" y1="${last[1]}" x2="${p[0]}" y2="${p[1]}" stroke="${RKC[i]}" stroke-width="1.6" stroke-dasharray="3 4" opacity=".6"/>`; seg.push(p); last = p; });
-    flush();
-    if (last) s += `<circle cx="${last[0]}" cy="${last[1]}" r="3.8" fill="${RKC[i]}"><title>${esc(k.q)}: #${Math.round(last[2])} in the last week it showed</title></circle>`;
-  });
-  [0, Math.floor((weeks.length - 1) / 2), weeks.length - 1].forEach(j => s += `<text x="${xOf(j)}" y="${H + 16}" text-anchor="${j === 0 ? 'start' : j === weeks.length - 1 ? 'end' : 'middle'}" font-size="11" fill="#8491a7" font-family="Urbanist">${dl(weeks[j])}</text>`);
-  return s + `</svg><div class="rk-legend">${top.map((k, i) => { const d = k.prev != null && k.pos != null ? k.prev - k.pos : null;
-    const cur = k.pos == null ? 'Not showing' : `#${Math.round(k.pos)}`;
-    return `<span><i style="background:${RKC[i]}"></i><b>${cur}</b><em title="${esc(k.q)}">${esc(k.q)}</em>${d != null && Math.abs(d) >= 0.5 ? `<b class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'}${Math.abs(d).toFixed(0)}</b>` : ''}</span>`; }).join('')}</div>
-    ${rest.length ? `<p class="note2">Not in the top ${CAP} yet: ${rest.map(k => `${esc(k.q)} (#${Math.round(k.pos)})`).join(', ')}.</p>` : ''}
-    <p class="note2">A dashed line bridges weeks when Google didn't show the site for that search. "Not showing" means no appearances in the last four weeks.</p>`;
+  const L = rankList();
+  if (!L.length) return '<p class="cap" style="margin-top:10px">Not enough search data yet.</p>';
+  const grp = [['Page one', x => x.pos <= 10.5], ['Page two, within reach', x => x.pos > 10.5 && x.pos <= 20.5], ['Further back', x => x.pos > 20.5]];
+  return grp.map(([t, f]) => { const g = L.filter(f); if (!g.length) return '';
+    return `<p class="cap" style="margin:14px 0 2px;font-weight:700;color:var(--ink2)">${t}</p>${g.map(x => { const d = x.prev != null ? x.prev - x.pos : null;
+      return `<div class="rk"><b class="${x.pos <= 10.5 ? 'p1' : ''}">#${Math.round(x.pos)}</b><span>${esc(x.q)}<small>${n0(x.i)} times seen, ${n0(x.c)} visits</small></span>
+        <em class="${d == null || Math.abs(d) < 1 ? '' : d > 0 ? 'up' : 'down'}">${d == null ? 'New' : Math.abs(d) < 1 ? 'Steady' : `${d > 0 ? '▲' : '▼'} ${Math.round(Math.abs(d))} in 4 weeks`}</em>${rankSpark(x.q)}</div>`; }).join('')}`; }).join('')
+    + `<p class="note2">Where the website appears in Google's regular results, averaged over the last four weeks. The map listings are separate and show up in the Google profile numbers. The small line is the last 12 weeks; up is better.</p>`;
 }
 function visibilityView() {
   const r = range(), pr = prior(), G = D.gbp?.daily || [], R = D.gbp?.reviews || { list: [] }, W = weeks12(), wk = f => W.map(x => f(x));
   const gIn = (rr, i) => sum(G.filter(x => inR(x[0], rr)), x => x[i]);
   const ch = (c, p) => (!p ? '' : `<em class="${c >= p ? 'good' : 'bad'}">${c >= p ? '▲' : '▼'} ${Math.round(Math.abs(c - p) / p * 100)}%</em>`);
   const newRev = R.list.filter(x => inR(x[0], r)), low = newRev.filter(x => x[1] && x[1] <= 3).length;
-  const T = D.gsc?.tracked || [], p1 = T.filter(x => x.pos != null && x.pos <= 10.5).length;
-  const mv = T.filter(x => x.pos != null && x.prev != null).map(x => x.prev - x.pos), avg = mv.length ? sum(mv, x => x) / mv.length : 0;
-  const head = `${p1} of ${T.length} key local searches on Google's first page.`;
+  const T = rankList(), p1 = T.filter(x => x.pos <= 10.5).length;
+  const mv = T.filter(x => x.prev != null).map(x => x.prev - x.pos), avg = mv.length ? sum(mv, x => x) / mv.length : 0;
+  const head = `${p1} of the ${T.length} top searches that find the practice are on Google's first page.`;
   const tag = R.total ? `${R.total} Google reviews${R.avg ? `, ${R.avg.toFixed(1)} stars on average` : ''}${newRev.length ? `, ${newRev.length} new ${rangeWords()}` : ''}.` : '';
-  const rank = `<div class="c8 card"><div class="top2"><div><h3>Where you rank on Google</h3><p class="cap">Weekly position for local searches that bring patients. Higher is better.${mv.length && Math.abs(avg) >= 0.5 ? ` They moved ${avg > 0 ? 'up' : 'down'} ${Math.abs(avg).toFixed(1)} places on average in four weeks.` : ''}</p></div><button class="more" style="margin:0" data-side="searches">All searches</button></div>${rankChart()}</div>`;
+  const rank = `<div class="c8 card"><div class="top2"><div><h3>Where you rank on Google</h3><p class="cap">The searches people used most to find the site. #1 is the top result.${mv.length && Math.abs(avg) >= 0.5 ? ` On average they moved ${avg > 0 ? 'up' : 'down'} ${Math.abs(avg).toFixed(1)} places in four weeks.` : ''}</p></div><button class="more" style="margin:0" data-side="searches">All searches</button></div>${rankChart()}</div>`;
   const prof = `<div class="c4 card"><h3>Google profile</h3>
     <div class="stat2"><div class="v"><b>${n0(R.total)}</b>${newRev.length ? `<em class="${low ? 'bad' : 'good'}">+${newRev.length}${low ? `, ${low} low` : ''}</em>` : '<em>No new reviews</em>'}</div><span>Google reviews${R.avg ? `, ${R.avg.toFixed(1)} stars` : ''}</span>${kspark(wk(x => R.list.filter(y => inR(y[0], x)).length), '#4da8d3')}</div>
     <div class="stat2"><div class="v"><b>${n0(gIn(r, 2))}</b>${ch(gIn(r, 2), gIn(pr, 2))}</div><span>Calls from your profile</span>${kspark(wk(x => gIn(x, 2)), '#4da8d3')}</div>
@@ -745,10 +781,10 @@ function visibilityView() {
       <div><b>${n0(inter)}</b><span>Likes, comments, shares</span>${cover ? ch(inter, sum(Dp, x => x[4])) : ''}</div><div><b>${posts.length}</b><span>Posts</span></div></div>
       ${top.length ? `<p class="cap" style="margin:10px 0 2px">Top posts</p>${top.map(x => `<a class="post" href="${esc(x.url)}" target="_blank" rel="noopener"><span class="pt">${esc(x.cap || 'Post')}</span><span class="pd">${dl(x.d)}</span><b>${n0(x.reach)}</b><small>${x.reach >= med * 2 ? `reached, ${(x.reach / med).toFixed(0)}× usual` : 'reached'}</small></a>`).join('')}` : `<p class="cap" style="margin-top:10px">No posts ${rangeWords()}.</p>`}</div>`;
   }
-  const almost = [...T.filter(x => x.pos > 10.5 && x.pos <= 20.5), ...(D.gsc?.almost || []).filter(x => !T.some(t => t.q === x.q))].slice(0, 6);
-  const near = `<div class="c4 card"><h3>Almost on page one</h3><p class="cap">Searches ranking 11 to 20, the cheapest wins next.</p>
+  const almost = (D.gsc?.almost || []).filter(x => !T.some(t => t.q === x.q)).slice(0, 6);
+  const near = `<div class="c4 card"><h3>More searches almost on page one</h3><p class="cap">Ranking 11 to 20 and not listed on the left. These are the cheapest wins next.</p>
     ${almost.length ? almost.map(x => `<div class="line"><span>${esc(x.q)}</span><b>#${Math.round(x.pos)}</b></div>`).join('') : '<p class="cap" style="margin-top:10px">None right now.</p>'}</div>`;
-  return [head, tag, `<div class="grid">${rank}${prof}${social}${near}</div>`];
+  return [head, tag, `<div class="grid">${rank}${prof}${almost.length ? social + near : social.replace('c8 card', 'c12 card')}</div>`];
 }
 
 // ----- Follow-ups
@@ -871,7 +907,7 @@ function sideAbout() {
 function sideView(v) {
   const [k, arg] = String(v.side || '').split(/:(.*)/s);
   if (k === 'k') return sideKpi(arg); if (k === 'src') return sideSource(arg); if (k === 'prov') return sideProv(arg); if (k === 'svc') return sideSvc(arg);
-  if (k === 'car') return sideCar(decodeURIComponent(arg)); if (k === 'owed') return sideOwed(); if (k === 'searches') return sideSearches(); if (k === 'instagram') return sideInstagram();
+  if (k === 'mkt') return sideMkt(arg); if (k === 'car') return sideCar(decodeURIComponent(arg)); if (k === 'owed') return sideOwed(); if (k === 'searches') return sideSearches(); if (k === 'instagram') return sideInstagram();
   return sideAbout();
 }
 function openSide(v, push) {

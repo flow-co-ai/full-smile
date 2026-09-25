@@ -115,7 +115,7 @@ const result = {
   generatedAt: now.toISOString(), today, asOf: yesterday, name: cfg.practice_name, ghlUrl: cfg.ghl_opportunities_url || '',
   ghl: { base: (cfg.ghl_app_base || 'https://app.gohighlevel.com').replace(/\/$/, ''), location: practice?.ghl?.location || cfg.ghl_location_id || '' },
   adsActive: cfg.ads_active !== false,
-  practice, spend, lsa: { lastMonth: lastLsaMonth, cap: cfg.lsa_monthly_cap || null },
+  practice, spend, lsa: { lastMonth: lastLsaMonth, entered: Object.keys(lsaMonths), cap: cfg.lsa_monthly_cap || null },
   meta: { ads, rows: adRows, forms }, gads: gadsRows,
   gbp: { daily: [...gbpDaily.values()].sort((a, b) => a[0].localeCompare(b[0])), reviews: { total: revTotal, list: revList, avg: rated.length ? +(rated.reduce((s, x) => s + x[1], 0) / rated.length).toFixed(2) : null } },
   gsc, ig, notes: [...notes, ...(practice?.notes || [])],
